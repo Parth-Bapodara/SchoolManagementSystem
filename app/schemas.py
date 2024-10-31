@@ -1,55 +1,59 @@
-from pydantic import BaseModel, Field, EmailStr, validator
+from pydantic import BaseModel, Field, validator
+import re
 
-class UserSchema(BaseModel):
-    f_name: str = Field(...)
-    l_name: str = Field(...)
-    email: EmailStr = Field(...)
-    password: str = Field(...)
-    role:str = Field(..., pattern="^(admin|teacher|student)$")
-
-    @validator('password')
-    def validate_password(cls, value):
-        if len(value)<8:
-            raise ValueError("Password must be atleast 8 character long.")
-        if not any(char.isupper() for char in value): 
-            raise ValueError("Password must contain atleast 1 Uppercase letter.")
-        if not any(char.islower() for char in value): 
-            raise ValueError("Password must contain atleast 1 Lowercase letter.")
-        if not any(char in "!@#$%^&*()_+-=[]{}|;:'\",.<>?/" for char in value):
-            raise ValueError("Password must contain atleast 1 special character.")
-        return value
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "f_name" : "Parth",
-                "l_name" : "Bapodara",
-                "email" : "demo@gmail.com",
-                "password" : "Weak@password",
-                "role": "Admin or Teacher or Student"
-            }
-        }
-
-class UserLogin(BaseModel):
-    email: EmailStr = Field(...)
-    password: str = Field(...)
+class UserCreate(BaseModel):
+    email: str
+    password: str = Field(..., min_length=8)
+    role: str = Field("student")
 
     @validator('password')
-    def validate_password(cls, value):
-        if len(value)<8:
-            raise ValueError("Password must be atleast 8 character long.")
-        if not any(char.isupper() for char in value): 
-            raise ValueError("Password must contain atleast 1 Uppercase letter.")
-        if not any(char.islower() for char in value): 
-            raise ValueError("Password must contain atleast 1 Lowercase letter.")
-        if not any(char in "!@#$%^&*()_+-=[]{}|;:'\",.<>?/" for char in value):
-            raise ValueError("Password must contain atleast 1 special character.")
+    def password_complexity(cls,value):
+        if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
+            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")
         return value
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "email": "demo@gmail.com",
-                "password": "Weak@password"
-            }
-        }
+
+class UserInDb(UserCreate):
+    hashed_password: str
+
+
+# class AdminCreate(BaseModel):
+#     username: str
+#     email: str
+#     password: str
+
+# class AdminResponse(BaseModel):
+#     id: int
+#     username: str
+#     email: str
+#     access_token: str
+#     token_type: str
+
+#     class Config:
+#         orm_mode = True
+
+# class StudentCreate(BaseModel):
+#     username: str
+#     email: str
+#     password: str
+
+# class StudentResponse(BaseModel):
+#     id: int
+#     username: str
+#     email: str
+
+#     class Config:
+#         orm_mode = True
+
+# class TeacherCreate(BaseModel):
+#     username: str
+#     email: str
+#     password: str
+
+# class TeacherResponse(BaseModel):
+#     id: int
+#     username: str
+#     email: str
+
+#     class Config:
+#         orm_mode = True
+
