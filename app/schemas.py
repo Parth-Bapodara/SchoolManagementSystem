@@ -1,59 +1,60 @@
 from pydantic import BaseModel, Field, validator
+from typing import Literal,Optional
 import re
 
+# User create Schema for user creation
 class UserCreate(BaseModel):
-    email: str
+    email: str = Field()
+    username: str = Field(...)
     password: str = Field(..., min_length=8)
-    role: str = Field("student")
+    role: Literal["student", "teacher", "admin"]
 
     @validator('password')
     def password_complexity(cls,value):
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
             raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")
         return value
-
-class UserInDb(UserCreate):
+    
+    @validator('username')
+    def username_complexity(cls,value):
+        if len(value) <= 3:
+            raise ValueError("Username must be at least 3 or more then characters long")
+        if not re.match(r'^[a-zA-Z0-9]+$',value):
+            raise ValueError("Username can only contain alphanumeric characters without spaces or special characters")
+        return value
+    
+    @validator('email')
+    def email_complexity(cls,value):
+        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
+            raise ValueError("Invalid Email Format. Must contain '@' and valid domain.")
+        return value
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "email": "parth@example.com",
+                "password": "Pass@1234",
+                "username": "parth123",
+                "role": "student"
+            }
+        }
+        
+# Check if If user exists in DB
+class UserInDb(BaseModel):
+    id: int
     hashed_password: str
+    status: str = "active"
+    email: str
+    username: str
+    role: str
+
+    class Config:
+        orm_mode = True
+
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    username: Optional[str] = None
 
 
-# class AdminCreate(BaseModel):
-#     username: str
-#     email: str
-#     password: str
-
-# class AdminResponse(BaseModel):
-#     id: int
-#     username: str
-#     email: str
-#     access_token: str
-#     token_type: str
-
-#     class Config:
-#         orm_mode = True
-
-# class StudentCreate(BaseModel):
-#     username: str
-#     email: str
-#     password: str
-
-# class StudentResponse(BaseModel):
-#     id: int
-#     username: str
-#     email: str
-
-#     class Config:
-#         orm_mode = True
-
-# class TeacherCreate(BaseModel):
-#     username: str
-#     email: str
-#     password: str
-
-# class TeacherResponse(BaseModel):
-#     id: int
-#     username: str
-#     email: str
-
-#     class Config:
-#         orm_mode = True
 
