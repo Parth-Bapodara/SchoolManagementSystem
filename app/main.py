@@ -9,7 +9,7 @@ from pydantic import EmailStr
 from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -204,6 +204,13 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
     if user_data["role"] not in ["teacher"]:
         raise HTTPException(status_code=403, detail="Only teachers can create exams.")
     
+    exam_date = exam_data.date
+    if exam_date.tzinfo is None:
+        exam_date = exam_date.replace(tzinfo=timezone.utc)
+    
+    if exam_date<datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Cannot create an exam with a past date or time.")
+
     subject = db.query(models.Subject).filter(models.Subject.id == exam_data.subject_id).first()
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
@@ -230,6 +237,11 @@ async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_sc
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can view exams.")
     
+    if user_data["role"] == "student":
+        exams= db.query(Exam).filter(Exam.status == "active").all()
+    else:
+        exams=db.query(Exam).all()
+
     exams = db.query(Exam).join(Subject).join(Class).all()
 
     for exam in exams:
@@ -279,7 +291,14 @@ async def update_exam(exam_id: int, exam_update: ExamUpdate, db: Session = Depen
         exam.class_id = exam_update.class_id
 
     if exam_update.date:
-        exam.date = exam_update.date
+        exam_date = exam_update.date
+        if exam_date.tzinfo is None:
+            exam_date = exam_date.replace(tzinfo=timezone.utc)
+    
+        if exam_date<datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Cannot create an exam with a past date or time.")
+        
+        exam.date=exam_date
     
     if exam_update.duration:
         exam.duration = exam_update.duration
@@ -298,6 +317,39 @@ async def update_exam(exam_id: int, exam_update: ExamUpdate, db: Session = Depen
         "duration": updated_exam.duration,
         "created_by": updated_exam.created_by
     }
+
+@exam_router.post("/exams/{exam_id}/take")
+async def take_exam(exam_id: int, answers: str, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    if user_data["role"] != "student":
+        raise HTTPException(status_code=403, detail="Only students can take exams.")
+    
+    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.status == "active").first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not available.")
+    
+    submission = models.ExamSubmission(exam_id=exam_id, student_id=user_data["sub"], answers=answers)
+    db.add(submission)
+    db.commit()
+    return {"message": "Exam submitted successfully."}
+
+@exam_router.post("/exams/{exam_id}/grade/{submission_id}")
+async def grade_submission(exam_id: int, submission_id: int, marks: float, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    if user_data["role"] != "teacher":
+        raise HTTPException(status_code=403, detail="Only teachers can grade submissions.")
+    
+    submission = db.query(models.ExamSubmission).filter(
+        models.ExamSubmission.id == submission_id,
+        models.ExamSubmission.exam_id == exam_id
+    ).first()
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    
+    submission.marks = marks
+    db.commit()
+    return {"message": "Marks assigned successfully."}
 
 @pass_router.post("/request-reset-token")
 def request_reset_token(user_id: int, db: Session = Depends(get_db)):

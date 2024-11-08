@@ -19,6 +19,7 @@ class User(Base):
     status = Column(String, default="active", nullable=False)
 
     attendances = relationship("Attendance", back_populates="user")
+    exam_submissions = relationship("ExamSubmission", back_populates="student")
 
 #DB model representing a class with fields like id and name.
 class Class(Base):
@@ -50,9 +51,10 @@ class Exam(Base):
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String, default="active")
 
+    submissions = relationship("ExamSubmission", back_populates="exam")
     subject = relationship("Subject", back_populates="exams")
     class_ = relationship("Class", back_populates="exams")
-
+    
     def update_status(self):
         if self.date < datetime.utcnow():
             self.status = "inactive"
@@ -73,3 +75,16 @@ class Attendance(Base):
         if self.clock_out:
             return(self.clock_out-self.clock_in).total_seconds()/3600
         return 0
+    
+#to track and manage student marks
+class ExamSubmission(Base):
+    __tablename__ = "exam_submissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    exam_id = Column(Integer, ForeignKey("exams.id"), nullable=False)
+    student_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    answers = Column(String, nullable=True)
+    marks = Column(Float, default=0)
+
+    exam = relationship("Exam", back_populates="submissions")
+    student = relationship("User", back_populates="exam_submissions")

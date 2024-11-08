@@ -118,6 +118,23 @@ class ExamUpdate(BaseModel):
     class Config:
         orm_mode = True
 
+#for creation of examsubmission
+class ExamSubmissionCreate(BaseModel):
+    answers: str
+
+class ExamSubmissionResponse(BaseModel):
+    id: int
+    exam_id: int
+    student_id: int
+    answers: str
+    marks: float
+
+    class Config:
+        orm_mode = True
+
+class ExamGrade(BaseModel):
+    marks: float
+
 #to clock in user
 class AttendanceIn(BaseModel):
     clock_in: datetime
