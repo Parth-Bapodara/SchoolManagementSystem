@@ -103,6 +103,7 @@ class ExamInDb(BaseModel):
     date: datetime
     duration: int
     created_by: int
+    status: str
 
     class Config:
         orm_mode = True
@@ -135,6 +136,10 @@ class AttendanceResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
+class WeeklyReportResponse(BaseModel):
+    total_hours_worked: float
+    distinct_days_worked: int
 
 #to reset user password
 class PasswordResetRequest(BaseModel):

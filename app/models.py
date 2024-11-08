@@ -1,7 +1,10 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 from .database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from sqlalchemy.ext.declarative import declarative_base
+
+base = declarative_base()
 
 #DB model representing a user with diffrent fields.
 class User(Base):
@@ -45,8 +48,14 @@ class Exam(Base):
     date = Column(DateTime, nullable=False)
     duration = Column(Integer, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    status = Column(String, default="active")
+
     subject = relationship("Subject", back_populates="exams")
     class_ = relationship("Class", back_populates="exams")
+
+    def update_status(self):
+        if self.date < datetime.utcnow():
+            self.status = "inactive"
 
 #DB model for attendence of user
 class Attendance(Base):

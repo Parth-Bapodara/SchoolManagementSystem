@@ -217,7 +217,7 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
         class_id=exam_data.class_id,
         date=exam_data.date,
         duration=exam_data.duration,
-        created_by=user_data["sub"]
+        created_by=user_data.get("user_id")
         )
     db.add(new_Exam)
     db.commit()
@@ -232,6 +232,10 @@ async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_sc
     
     exams = db.query(Exam).join(Subject).join(Class).all()
 
+    for exam in exams:
+        exam.update_status()
+    db.commit()
+
     exams_with_names = [
         {
             "id": exam.id,
@@ -241,6 +245,7 @@ async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_sc
             "class_name": exam.class_.name,
             "date": exam.date,
             "duration": exam.duration,
+            "status": exam.status,
             "created_by": exam.created_by
         } 
         for exam in exams
