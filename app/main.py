@@ -122,12 +122,8 @@ async def update_user_info(
     if not current_user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    if user_update.email:
-        current_user.email = user_update.email
     if user_update.password:
         current_user.hashed_password = security.get_password_hash(user_update.password)
-    if user_update.username:
-        current_user.username = user_update.username
 
     db.commit()
     db.refresh(current_user)

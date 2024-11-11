@@ -54,28 +54,12 @@ class UserInDb(BaseModel):
 
 #To update a user information like email,username,password
 class UserUpdate(BaseModel):
-    email: Optional[str] = None
     password: Optional[str] = None
-    username: Optional[str] = None
 
     @validator('password')
     def password_complexity(cls,value):
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
             raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")
-        return value
-    
-    @validator('username')
-    def username_complexity(cls,value):
-        if len(value) <= 3:
-            raise ValueError("Username must be at least 3 or more then characters long")
-        if not re.match(r'^[a-zA-Z0-9]+$',value):
-            raise ValueError("Username can only contain alphanumeric characters without spaces or special characters")
-        return value
-    
-    @validator('email')
-    def email_complexity(cls,value):
-        if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
-            raise ValueError("Invalid Email Format. Must contain '@' and valid domain.")
         return value
 
 #For creating new diffrent Classes 

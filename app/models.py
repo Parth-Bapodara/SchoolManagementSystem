@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 from .database import Base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 
 base = declarative_base()
@@ -58,8 +58,14 @@ class Exam(Base):
     def update_status(self):
         if self.date < datetime.utcnow():
             self.status = "inactive"
+#     current = datetime.now()
+#     total = timedelta(minutes=duration)
+#     def update_status(self):
+#         n_hours = self.current + self.total
+#         if self.date < n_hours:
+#             self.status = "inactive"
 
-#DB model for attendence of user
+# DB model for attendence of user
 class Attendance(Base):
     __tablename__ = "attendances"
 
