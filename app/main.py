@@ -351,28 +351,28 @@ async def grade_submission(exam_id: int, submission_id: int, marks: float, db: S
     db.commit()
     return {"message": "Marks assigned successfully."}
 
-# @exam_router.get("/exams/{exam_id}/grade/{submission_id}")
-# async def get_marks(exam_id:int, student_id=int, db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-#     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-#     if user_data["role"] not in ["student","teacher"] :
-#         raise HTTPException(status_code=403, detail="Only teachers and student can view marks.")
+@exam_router.get("/exams/{exam_id}/grade/{submission_id}")
+async def get_marks(exam_id:int, student_id=int, db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    if user_data["role"] not in ["student","teacher"] :
+        raise HTTPException(status_code=403, detail="Only teachers and student can view marks.")
     
-#     get_student = db.query(models.ExamSubmission).filter(
-#         models.ExamSubmission.student_id == student_id
-#     ).first()
+    get_student = db.query(models.ExamSubmission).filter(
+        models.ExamSubmission.student_id == student_id
+    ).first()
 
-#     if not get_student:
-#         raise HTTPException(status_code=403, detail="Can not find Student with Given ID")
+    if not get_student:
+        raise HTTPException(status_code=403, detail="Can not find Student with Given ID")
 
-#     submission_exam = db.query(models.ExamSubmission).filter(
-#         models.ExamSubmission.exam_id == exam_id
-#     ).first()
+    submission_exam = db.query(models.ExamSubmission).filter(
+        models.ExamSubmission.exam_id == exam_id
+    ).first()
     
-#     if not submission_exam:
-#         raise HTTPException(status_code=404, detail="Exam or Submission not found.")
+    if not submission_exam:
+        raise HTTPException(status_code=404, detail="Exam or Submission not found.")
     
-#     your_marks=submission_exam.marks
-#     return{"message":"Your marks for this exam is:" f"{your_marks}"}
+    your_marks=submission_exam.marks
+    return{"message":"Your marks for this exam is:" f"{your_marks}"}
 
 @pass_router.post("/request-reset-token")
 def request_reset_token(user_id: int, db: Session = Depends(get_db)):
