@@ -97,7 +97,9 @@ class ExamUpdate(BaseModel):
     subject_id: Optional[int] = None
     class_id: Optional[int] = None
     date: Optional[datetime] = None
-    duration: Optional[str] = None
+    duration: Optional[int] = None
+    status: Optional[str] = None
+    marks: Optional[float] = None
 
     class Config:
         orm_mode = True
@@ -142,21 +144,36 @@ class WeeklyReportResponse(BaseModel):
     total_hours_worked: float
     distinct_days_worked: int
 
-#to reset user password
+
 class PasswordResetRequest(BaseModel):
-    reset_token: str
+    email: str
+    reset_code: int
     new_password: str
 
     # Optional: validate password complexity
     @validator("new_password")
     def validate_password(cls, password):
+        # Minimum password length
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long.")
+        # Must contain at least one digit
         if not any(char.isdigit() for char in password):
             raise ValueError("Password must contain at least one digit.")
+        # Must contain at least one uppercase letter
         if not any(char.isupper() for char in password):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
+
+    # Validate reset code to ensure it's a 6-digit number
+    @validator("reset_code")
+    def validate_reset_code(cls, code):
+        if not (100000 <= code <= 999999):
+            raise ValueError("Reset code must be a 6-digit number.")
+        return code
+
+
+class PasswordResetTokenRequest(BaseModel):
+    user_id: int
 
 #to change users password
 class ChangePasswordRequest(BaseModel):

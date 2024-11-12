@@ -49,15 +49,15 @@ class Exam(Base):
     date = Column(DateTime, nullable=False)
     duration = Column(Integer, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    status = Column(String, default="active")
+    status = Column(String, default="scheduled")
 
     submissions = relationship("ExamSubmission", back_populates="exam")
     subject = relationship("Subject", back_populates="exams")
     class_ = relationship("Class", back_populates="exams")
     
-    def update_status(self):
-        if self.date < datetime.utcnow():
-            self.status = "inactive"
+    # def update_status(self):
+    #     if self.date < datetime.utcnow():
+    #         self.status = "inactive"
 #     current = datetime.now()
 #     total = timedelta(minutes=duration)
 #     def update_status(self):
@@ -94,3 +94,4 @@ class ExamSubmission(Base):
 
     exam = relationship("Exam", back_populates="submissions")
     student = relationship("User", back_populates="exam_submissions")
+

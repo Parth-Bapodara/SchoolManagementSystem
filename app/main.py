@@ -1,15 +1,29 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from .models import User, Class, Exam, Subject
+from .models import User, Class, Exam, Subject, ExamSubmission
 from .schemas import UserCreate, UserInDb, UserUpdate, ClassCreate, SubjectCreate, ExamCreate, ExamInDb, ExamUpdate
 from .database import get_db, Base, engine
 from . import security,attendance
-from pydantic import EmailStr
 from jose import jwt, JWTError
 from fastapi import APIRouter
-from . import models,schemas,database
+from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
+from fastapi_mail import FastMail, MessageSchema
+from fastapi import BackgroundTasks
+import random,secrets
+
+# conf = ConnectionConfig(
+#     MAIL_USERNAME="parth.bapodara@mindinventory.com",
+#     MAIL_PASSWORD="P@RTh##234",
+#     MAIL_FROM="parth.bapodara@mindinventory.com",
+#     MAIL_PORT=587,
+#     MAIL_SERVER="smtp.gmail.com",
+#     MAIL_STARTTLS = True,
+#     MAIL_SSL_TLS=False,
+#     USE_CREDENTIALS = True,
+#     VALIDATE_CERTS = True
+# )
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -233,16 +247,17 @@ async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_sc
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can view exams.")
     
-    if user_data["role"] == "student":
-        exams= db.query(Exam).filter(Exam.status == "active").all()
-    else:
-        exams=db.query(Exam).all()
+    # if user_data["role"] == "student":
+    #     exams= db.query(Exam).filter(Exam.status == "active").all()
+    # else:
+    #     exams=db.query(Exam).all()
 
     exams = db.query(Exam).join(Subject).join(Class).all()
 
     for exam in exams:
-        exam.update_status()
-    db.commit()
+        if exam.date <= datetime.utcnow() and exam.status == "scheduled":
+            exam.status = "finished"
+            db.commit()
 
     exams_with_names = [
         {
@@ -283,7 +298,7 @@ async def update_exam(exam_id: int, exam_update: ExamUpdate, db: Session = Depen
     if exam_update.class_id:
         class_ = db.query(Class).filter(Class.id == exam_update.class_id).first()
         if not class_:
-            raise HTTPException(status_code=404, detail="Subject not found")
+            raise HTTPException(status_code=404, detail="Class not found")
         exam.class_id = exam_update.class_id
 
     if exam_update.date:
@@ -316,93 +331,207 @@ async def update_exam(exam_id: int, exam_update: ExamUpdate, db: Session = Depen
 
 @exam_router.post("/exams/{exam_id}/take")
 async def take_exam(exam_id: int, answers: str, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-    user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    try:
+        # Decode and verify the user's role
+        user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired.")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token.")
+
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can take exams.")
     
-    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.status == "active").first()
+    # Check if the exam is available (status is "scheduled")
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id, models.Exam.status == "scheduled").first()
     if not exam:
-        raise HTTPException(status_code=404, detail="Exam not available.")
-    
+        raise HTTPException(status_code=404, detail="Exam not available or already started/completed.")
+
+    # Check if the student has already submitted the exam
+    existing_submission = db.query(models.ExamSubmission).filter(models.ExamSubmission.exam_id == exam_id, models.ExamSubmission.student_id == user_data["user_id"]).first()
+    if existing_submission:
+        raise HTTPException(status_code=400, detail="You have already submitted this exam.")
+
+    # Create a new exam submission
     submission = models.ExamSubmission(exam_id=exam_id, student_id=user_data["user_id"], answers=answers)
     db.add(submission)
     db.commit()
-    return {"message": "Exam submitted successfully."}
+    db.refresh(submission)  # To get the actual ID and updated data from DB
 
-@exam_router.post("/exams/{exam_id}/grade/{submission_id}")
-async def grade_submission(exam_id: int, submission_id: int, marks: float, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    # Return a success message along with submission details, placing submission_id before or after the message
+    return {
+        "message": "Exam submitted successfully.",
+        "submission_id": submission.id  # You can switch positions of message and submission_id here
+    }
+
+@exam_router.put("/exam-submissions/{submission_id}/marks", response_model=schemas.ExamSubmissionResponse)
+async def update_marks(submission_id: int, marks: float, exam_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    # Decode and verify the user's role
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    
     if user_data["role"] != "teacher":
-        raise HTTPException(status_code=403, detail="Only teachers can grade submissions.")
+        raise HTTPException(status_code=403, detail="Only teachers can update/give marks.")
     
-    submission = db.query(models.ExamSubmission).filter(
-        models.ExamSubmission.id == submission_id,
-        models.ExamSubmission.exam_id == exam_id
-    ).first()
+    # **First Commented Validation (Exam Exists)** 
+    # Ensure the exam exists in the database
+    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found.")
     
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found.")
+    # **Second Commented Validation (Exam Status)** 
+    # Ensure the exam is completed (status is 'finished') before updating marks
+    if exam.status != "finished":
+        raise HTTPException(status_code=400, detail="Marks can only be entered after the completion of the exam.")
     
-    submission.marks = marks
-    db.commit()
-    return {"message": "Marks assigned successfully."}
-
-@exam_router.get("/exams/{exam_id}/grade/{submission_id}")
-async def get_marks(exam_id:int, student_id=int, db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+    # Update the marks for the exam submission
+    submission = crud.update_exam_submission_marks(db, submission_id, marks)
+    
+    if submission:
+        # Return the updated submission with marks
+        return schemas.ExamSubmissionResponse(
+            id=submission.id,
+            exam_id=submission.exam_id,
+            student_id=submission.student_id,
+            answers=submission.answers,
+            marks=submission.marks
+        )
+    else:
+        raise HTTPException(status_code=404, detail="Exam Submission not found.")    
+    
+@exam_router.get("/exams/{exam_id}/marks")
+async def get_exam_marks(
+    exam_id: int, 
+    db: Session = Depends(get_db), 
+    token: str = Depends(oauth2_scheme)
+):
+    # Decode the token and check the user's role
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-    if user_data["role"] not in ["student","teacher"] :
-        raise HTTPException(status_code=403, detail="Only teachers and student can view marks.")
-    
-    get_student = db.query(models.ExamSubmission).filter(
-        models.ExamSubmission.student_id == student_id
-    ).first()
 
-    if not get_student:
-        raise HTTPException(status_code=403, detail="Can not find Student with Given ID")
-
-    submission_exam = db.query(models.ExamSubmission).filter(
-        models.ExamSubmission.exam_id == exam_id
-    ).first()
+    # Determine the user role and set the student_id accordingly
+    student_id = None
+    if user_data["role"] == "student":
+        student_id = user_data["user_id"]
+    elif user_data["role"] == "teacher":
+        student_id = None  # Teachers can view all students' submissions
+    else:
+        raise HTTPException(status_code=403, detail="Unauthorized access.")
     
-    if not submission_exam:
-        raise HTTPException(status_code=404, detail="Exam or Submission not found.")
+    # Check if the exam exists in the database
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found.")
     
-    your_marks=submission_exam.marks
-    return{"message":"Your marks for this exam is:" f"{your_marks}"}
+    # Query the exam submission based on user role
+    if student_id:
+        # If the user is a student, get their marks for the specified exam
+        submission = db.query(ExamSubmission).filter(
+            ExamSubmission.exam_id == exam_id,
+            ExamSubmission.student_id == student_id
+        ).first()
+        
+        if not submission:
+            raise HTTPException(status_code=404, detail="No submission found for this student.")
+        
+        return {"exam_id": exam_id, "marks": submission.marks}
+    
+    # If the user is a teacher, get marks for all students
+    submissions = db.query(ExamSubmission).filter(ExamSubmission.exam_id == exam_id).all()
+    if not submissions:
+        raise HTTPException(status_code=404, detail="No submissions found for this exam.")
+    
+    return [
+        {"student_id": submission.student_id, "marks": submission.marks}
+        for submission in submissions
+    ]
 
-@pass_router.post("/request-reset-token")
-def request_reset_token(user_id: int, db: Session = Depends(get_db)):
-    # Locate user by ID
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+# Utility function for code expiration check
+def is_reset_code_expired(expiration_time: datetime) -> bool:
+    return expiration_time < datetime.utcnow()
+
+# Request Reset Code Route
+@pass_router.post("/request-reset-code")
+async def request_reset_code(email: str, db: Session = Depends(get_db)):
+    # Check if user exists
+    user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     
-    token_data={"user_id": user.id}
-    reset_token = security.create_access_token(data=token_data, expires_delta=timedelta(minutes=15))
+    reset_code = secrets.randbelow(900000) + 100000  
+    
+    user.reset_code = reset_code
+    user.reset_code_expiration = datetime.utcnow() + timedelta(minutes=15)
+    db.commit()
 
-    return{"reset_token": reset_token}
+    # Prepare and send the reset code via email
+    message = MessageSchema(
+        subject="Password Reset Request",
+        recipients=[user.email],
+        body=f"Hello, use the following code to reset your password: {reset_code}",
+        subtype="plain"
+    )
 
-@pass_router.post("/reset-password")
-def reset_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
-    # Decode and validate the token
+    # Configuring email settings from environment
+    fm = FastMail(config.email_settings)
     try:
-        payload = security.decode_token(request.reset_token)  # Custom decode function to handle JWT decoding
-        user_id = payload.get("user_id")
-        if not user_id:
-            raise HTTPException(status_code=400, detail="Invalid token.")
-    except JWTError:
-        raise HTTPException(status_code=403, detail="Token is invalid or expired.")
+        await fm.send_message(message)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error sending email: " + str(e))
+
+    return {"message": "Reset code sent to your email"}
+
+# Reset Password Route
+@pass_router.post("/reset-password")
+async def reset_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    # Find user by email
+    user = db.query(models.User).filter(models.User.email == request.email).first()
+    if not user or user.reset_code != request.reset_code:
+        raise HTTPException(status_code=400, detail="Invalid reset code.")
     
-    # Find the user
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    # Check if reset code has expired
+    if is_reset_code_expired(user.reset_code_expiration):
+        raise HTTPException(status_code=403, detail="Reset code has expired.")
     
     # Update the user's password
     user.hashed_password = security.get_password_hash(request.new_password)
+    user.reset_code = None  # Clear reset code after successful reset
+    user.reset_code_expiration = None  # Clear expiration time
     db.commit()
-    
+
     return {"message": "Password reset successfully."}
+
+# @pass_router.post("/request-reset-token")
+# def request_reset_token(user_id: int, db: Session = Depends(get_db)):
+#     # Locate user by ID
+#     user = db.query(models.User).filter(models.User.id == user_id).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found.")
+    
+#     token_data={"user_id": user.id}
+#     reset_token = security.create_access_token(data=token_data, expires_delta=timedelta(minutes=15))
+
+#     return{"reset_token": reset_token}
+
+# @pass_router.post("/reset-password")
+# def reset_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+#     # Decode and validate the token
+#     try:
+#         payload = security.decode_token(request.reset_token)  # Custom decode function to handle JWT decoding
+#         user_id = payload.get("user_id")
+#         if not user_id:
+#             raise HTTPException(status_code=400, detail="Invalid token.")
+#     except JWTError:
+#         raise HTTPException(status_code=403, detail="Token is invalid or expired.")
+    
+#     # Find the user
+#     user = db.query(models.User).filter(models.User.id == user_id).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found.")
+    
+#     # Update the user's password
+#     user.hashed_password = security.get_password_hash(request.new_password)
+#     db.commit()
+    
+#     return {"message": "Password reset successfully."}
 
 @pass_router.post("/change-password", response_model=schemas.Message)
 def change_password(
