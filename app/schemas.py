@@ -146,20 +146,33 @@ class WeeklyReportResponse(BaseModel):
 
 
 class PasswordResetRequest(BaseModel):
-    email: str
+    email: EmailStr
 
 class PasswordResetVerify(BaseModel):
     email: EmailStr
     code: str
-
-class PasswordUpdate(BaseModel):
-    email: EmailStr
     new_password: str
     confirm_password: str
 
     # Optional: validate password complexity
     @validator("new_password")
     def validate_password(cls, password):
+        if len(password) < 8:
+            raise ValueError("Password must be at least 8 characters long.")
+        if not any(char.isdigit() for char in password):
+            raise ValueError("Password must contain at least one digit.")
+        if not any(char.isupper() for char in password):
+            raise ValueError("Password must contain at least one uppercase letter.")
+        return password
+
+class ChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_password: str
+
+    @validator("new_password")
+    def validate_password(cls, password):
+        # Ensure the password is at least 8 characters, contains a digit and an uppercase letter
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long.")
         if not any(char.isdigit() for char in password):

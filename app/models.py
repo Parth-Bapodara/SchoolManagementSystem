@@ -4,8 +4,6 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 
-base = declarative_base()
-
 #DB model representing a user with diffrent fields.
 class User(Base):
     __tablename__ = "users"
@@ -20,6 +18,7 @@ class User(Base):
 
     attendances = relationship("Attendance", back_populates="user")
     exam_submissions = relationship("ExamSubmission", back_populates="student")
+    reset_requests = relationship("PasswordResetRequest", back_populates="user")
 
 #DB model representing a class with fields like id and name.
 class Class(Base):
@@ -55,16 +54,6 @@ class Exam(Base):
     subject = relationship("Subject", back_populates="exams")
     class_ = relationship("Class", back_populates="exams")
     
-    # def update_status(self):
-    #     if self.date < datetime.utcnow():
-    #         self.status = "inactive"
-#     current = datetime.now()
-#     total = timedelta(minutes=duration)
-#     def update_status(self):
-#         n_hours = self.current + self.total
-#         if self.date < n_hours:
-#             self.status = "inactive"
-
 # DB model for attendence of user
 class Attendance(Base):
     __tablename__ = "attendances"
@@ -95,3 +84,19 @@ class ExamSubmission(Base):
     exam = relationship("Exam", back_populates="submissions")
     student = relationship("User", back_populates="exam_submissions")
 
+#to perform password reset functionality
+class PasswordResetRequest(Base):
+    __tablename__ = "password_reset_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    reset_code = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    expiry_time = Column(DateTime, nullable=False)
+
+    user = relationship("User", back_populates="reset_requests")
+
+    def __init__(self, user_id, reset_code, expiry_time):
+        self.user_id = user_id
+        self.reset_code = reset_code
+        self.expiry_time = expiry_time

@@ -9,21 +9,6 @@ from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
-from fastapi_mail import FastMail, MessageSchema
-from fastapi import BackgroundTasks
-import random,secrets
-
-# conf = ConnectionConfig(
-#     MAIL_USERNAME="parth.bapodara@mindinventory.com",
-#     MAIL_PASSWORD="P@RTh##234",
-#     MAIL_FROM="parth.bapodara@mindinventory.com",
-#     MAIL_PORT=587,
-#     MAIL_SERVER="smtp.gmail.com",
-#     MAIL_STARTTLS = True,
-#     MAIL_SSL_TLS=False,
-#     USE_CREDENTIALS = True,
-#     VALIDATE_CERTS = True
-# )
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -366,28 +351,21 @@ async def take_exam(exam_id: int, answers: str, db: Session = Depends(get_db), t
 
 @exam_router.put("/exam-submissions/{submission_id}/marks", response_model=schemas.ExamSubmissionResponse)
 async def update_marks(submission_id: int, marks: float, exam_id: int, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-    # Decode and verify the user's role
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
     
     if user_data["role"] != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can update/give marks.")
     
-    # **First Commented Validation (Exam Exists)** 
-    # Ensure the exam exists in the database
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found.")
     
-    # **Second Commented Validation (Exam Status)** 
-    # Ensure the exam is completed (status is 'finished') before updating marks
     if exam.status != "finished":
         raise HTTPException(status_code=400, detail="Marks can only be entered after the completion of the exam.")
     
-    # Update the marks for the exam submission
     submission = crud.update_exam_submission_marks(db, submission_id, marks)
     
     if submission:
-        # Return the updated submission with marks
         return schemas.ExamSubmissionResponse(
             id=submission.id,
             exam_id=submission.exam_id,
@@ -444,107 +422,74 @@ async def get_exam_marks(
         for submission in submissions
     ]
 
-# Utility function for code expiration check
-@app.post("/password-reset-request/")
+@pass_router.post("/password-reset-request/")
 async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Generate the reset code
     reset_code = config.generate_verification_code()
-    user.reset_code = reset_code
+
+    # Set the expiry time (e.g., 15 minutes from now)
+    expiry_time = datetime.utcnow() + timedelta(minutes=15)
+
+    # Store the reset code and expiry time in the PasswordResetRequest table
+    reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
+    db.add(reset_request)
     db.commit()
 
     await config.send_verification_email(data.email, reset_code)
     return {"message": "Verification code sent to your email"}
 
-# Verify the code sent to the user
-@app.post("/password-reset-verify/")
-async def password_reset_verify(data: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email, User.reset_code == data.code).first()
-    if not user:
+@pass_router.post("/password-reset/")
+async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
+    reset_request = db.query(models.PasswordResetRequest).join(models.User).filter(
+        models.User.email == data.email, models.PasswordResetRequest.reset_code == data.code
+    ).first()
+
+    if not reset_request:
         raise HTTPException(status_code=400, detail="Invalid code or email")
 
-    return {"message": "Code verified, you may proceed to reset your password"}
+    if reset_request.expiry_time < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="Reset code has expired")
 
-# Update the password after code verification
-@app.post("/password-update/")
-async def password_update(data: schemas.PasswordUpdate, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == data.email).first()
-    if not user or user.reset_code is None:
-        raise HTTPException(status_code=400, detail="Verification required before password reset")
+    user = db.query(models.User).filter(models.User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
     if data.new_password != data.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
+    if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
+
+    # Update the user's password
     user.password = security.get_password_hash(data.new_password)
-    user.reset_code = None 
+    
+    # Commit the changes to the database
     db.commit()
 
-    return {"message": "Password updated successfully"}
+    # Optionally, delete the reset code from the PasswordResetRequest table after successful password update (clean-up)
+    db.delete(reset_request)
+    db.commit()
 
-# @pass_router.post("/request-reset-token")
-# def request_reset_token(user_id: int, db: Session = Depends(get_db)):
-#     # Locate user by ID
-#     user = db.query(models.User).filter(models.User.id == user_id).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found.")
-    
-#     token_data={"user_id": user.id}
-#     reset_token = security.create_access_token(data=token_data, expires_delta=timedelta(minutes=15))
+    return {"message": "Password reset successful"}
 
-#     return{"reset_token": reset_token}
+@pass_router.post("/password-change/")
+async def change_password(data: schemas.ChangePassword, current_user: models.User = Depends(security.get_current_user), db: Session = Depends(get_db)):
 
-# @pass_router.post("/reset-password")
-# def reset_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
-#     # Decode and validate the token
-#     try:
-#         payload = security.decode_token(request.reset_token)  # Custom decode function to handle JWT decoding
-#         user_id = payload.get("user_id")
-#         if not user_id:
-#             raise HTTPException(status_code=400, detail="Invalid token.")
-#     except JWTError:
-#         raise HTTPException(status_code=403, detail="Token is invalid or expired.")
-    
-#     # Find the user
-#     user = db.query(models.User).filter(models.User.id == user_id).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found.")
-    
-#     # Update the user's password
-#     user.hashed_password = security.get_password_hash(request.new_password)
-#     db.commit()
-    
-#     return {"message": "Password reset successfully."}
+    if not security.pwd_context.verify(data.old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="New password and confirm password do not match")
+    if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
 
-# @pass_router.post("/change-password", response_model=schemas.Message)
-# def change_password(
-#     request: schemas.ChangePasswordRequest, 
-#     user: models.User = Depends(security.get_current_user),
-#     db: Session = Depends(get_db)
-# ):
-#     # Verify old password
-#     if not security.verify_password(request.old_password, user.hashed_password):
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="Old password is incorrect"
-#         )
-    
-#     # Check if the new password and confirmation match
-#     if request.new_password != request.confirm_new_password:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="New password and confirmation do not match"
-#         )
+    current_user.password = security.pwd_context.hash(data.new_password)
+    db.commit()
 
-#     # Hash the new password
-#     hashed_new_password = security.get_password_hash(request.new_password)
-
-#     # Update the password in the database
-#     user.hashed_password = hashed_new_password
-#     db.commit()
-
-#     return {"message": "Password updated successfully"}
+    return {"message": "Password changed successfully"}
 
 app.include_router(admin_router)
 app.include_router(user_router)
