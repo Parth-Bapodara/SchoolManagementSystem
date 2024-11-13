@@ -1,42 +1,44 @@
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from pydantic_settings import BaseSettings
-from dotenv import load_dotenv
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from pydantic import BaseModel, EmailStr
+import random
+from typing import Optional
 
-load_dotenv()
-
-class EmailSettings(BaseSettings):
-    MAIL_USERNAME: str
-    MAIL_PASSWORD: str
-    MAIL_FROM: str
-    MAIL_PORT: int = 443
+# Email Configuration
+class EmailSettings(BaseModel):
+    MAIL_USERNAME: str = "parth.bapodara@mindinventory.com"
+    MAIL_PASSWORD: str = "P@RTh##234"
+    MAIL_FROM: EmailStr = "parth.bapodara@mindinventory.com"
     MAIL_SERVER: str = "smtp.gmail.com"
-    MAIL_TLS_SSL: bool = True
-    MAIL_STARTTLS: bool = False
+    MAIL_PORT: int = 587
+    MAIL_STARTTLS: bool = True
+    MAIL_SSL_TLS: bool = False
     USE_CREDENTIALS: bool = True
-    # TEMPLATE_FOLDER: str = "None"  
-    MAIL_FROM_NAME: str
-
-    class Config:
-        env_file = ".env"
+    VALIDATE_CERTS: bool = True
 
 email_settings = EmailSettings()
+conf = ConnectionConfig(
+    MAIL_USERNAME=email_settings.MAIL_USERNAME,
+    MAIL_PASSWORD=email_settings.MAIL_PASSWORD,
+    MAIL_FROM=email_settings.MAIL_FROM,
+    MAIL_PORT=email_settings.MAIL_PORT,
+    MAIL_SERVER=email_settings.MAIL_SERVER,
+    MAIL_STARTTLS=email_settings.MAIL_STARTTLS,
+    MAIL_SSL_TLS=email_settings.MAIL_SSL_TLS,
+    USE_CREDENTIALS= email_settings.USE_CREDENTIALS,
+    VALIDATE_CERTS= email_settings.VALIDATE_CERTS
+)
 
-try:
-    with smtplib.SMTP(email_settings.MAIL_SERVER, email_settings.MAIL_PORT) as server:
-        server.starttls() if email_settings.MAIL_STARTTLS else None
-        server.login(email_settings.MAIL_USERNAME, email_settings.MAIL_PASSWORD)
+# Generate a 6-digit random code
+def generate_verification_code() -> str:
+    return f"{random.randint(100000, 999999)}"
 
-        msg = MIMEMultipart()
-        msg['From'] = email_settings.MAIL_FROM
-        msg['To'] = "khushbu.chhikniwala@mindinventory.com"
-        msg['Subject'] = "Test Email"
-        body = "This is a test email sent from Python."
-        msg.attach(MIMEText(body, 'plain'))
-
-        server.sendmail(email_settings.MAIL_FROM, "khushbu.chhikniwala@mindinventory.com", msg.as_string())
-        print("Email sent successfully!")
-
-except Exception as e:
-    print(f"Failed to send email: {e}")
+# Send the verification email
+async def send_verification_email(email: EmailStr, code: str):
+    message = MessageSchema(
+        subject="Password Reset Code",
+        recipients=[email],
+        body=f"Your password reset code is: {code}",
+        subtype="plain"
+    )
+    fm = FastMail(conf)
+    await fm.send_message(message)

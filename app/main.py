@@ -445,59 +445,43 @@ async def get_exam_marks(
     ]
 
 # Utility function for code expiration check
-def is_reset_code_expired(expiration_time: datetime) -> bool:
-    return expiration_time < datetime.utcnow()
-
-# Request Reset Code Route
-@pass_router.post("/request-reset-code")
-async def request_reset_code(email: str, db: Session = Depends(get_db)):
-    # Check if user exists
-    user = db.query(models.User).filter(models.User.email == email).first()
+@app.post("/password-reset-request/")
+async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    
-    reset_code = secrets.randbelow(900000) + 100000  
-    
+        raise HTTPException(status_code=404, detail="User not found")
+
+    reset_code = config.generate_verification_code()
     user.reset_code = reset_code
-    user.reset_code_expiration = datetime.utcnow() + timedelta(minutes=15)
     db.commit()
 
-    # Prepare and send the reset code via email
-    message = MessageSchema(
-        subject="Password Reset Request",
-        recipients=[user.email],
-        body=f"Hello, use the following code to reset your password: {reset_code}",
-        subtype="plain"
-    )
+    await config.send_verification_email(data.email, reset_code)
+    return {"message": "Verification code sent to your email"}
 
-    # Configuring email settings from environment
-    fm = FastMail(config.email_settings)
-    try:
-        await fm.send_message(message)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Error sending email: " + str(e))
+# Verify the code sent to the user
+@app.post("/password-reset-verify/")
+async def password_reset_verify(data: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email, User.reset_code == data.code).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid code or email")
 
-    return {"message": "Reset code sent to your email"}
+    return {"message": "Code verified, you may proceed to reset your password"}
 
-# Reset Password Route
-@pass_router.post("/reset-password")
-async def reset_password(request: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
-    # Find user by email
-    user = db.query(models.User).filter(models.User.email == request.email).first()
-    if not user or user.reset_code != request.reset_code:
-        raise HTTPException(status_code=400, detail="Invalid reset code.")
-    
-    # Check if reset code has expired
-    if is_reset_code_expired(user.reset_code_expiration):
-        raise HTTPException(status_code=403, detail="Reset code has expired.")
-    
-    # Update the user's password
-    user.hashed_password = security.get_password_hash(request.new_password)
-    user.reset_code = None  # Clear reset code after successful reset
-    user.reset_code_expiration = None  # Clear expiration time
+# Update the password after code verification
+@app.post("/password-update/")
+async def password_update(data: schemas.PasswordUpdate, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user or user.reset_code is None:
+        raise HTTPException(status_code=400, detail="Verification required before password reset")
+
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    user.password = security.get_password_hash(data.new_password)
+    user.reset_code = None 
     db.commit()
 
-    return {"message": "Password reset successfully."}
+    return {"message": "Password updated successfully"}
 
 # @pass_router.post("/request-reset-token")
 # def request_reset_token(user_id: int, db: Session = Depends(get_db)):
@@ -533,34 +517,34 @@ async def reset_password(request: schemas.PasswordResetRequest, db: Session = De
     
 #     return {"message": "Password reset successfully."}
 
-@pass_router.post("/change-password", response_model=schemas.Message)
-def change_password(
-    request: schemas.ChangePasswordRequest, 
-    user: models.User = Depends(security.get_current_user),
-    db: Session = Depends(get_db)
-):
-    # Verify old password
-    if not security.verify_password(request.old_password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Old password is incorrect"
-        )
+# @pass_router.post("/change-password", response_model=schemas.Message)
+# def change_password(
+#     request: schemas.ChangePasswordRequest, 
+#     user: models.User = Depends(security.get_current_user),
+#     db: Session = Depends(get_db)
+# ):
+#     # Verify old password
+#     if not security.verify_password(request.old_password, user.hashed_password):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Old password is incorrect"
+#         )
     
-    # Check if the new password and confirmation match
-    if request.new_password != request.confirm_new_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password and confirmation do not match"
-        )
+#     # Check if the new password and confirmation match
+#     if request.new_password != request.confirm_new_password:
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="New password and confirmation do not match"
+#         )
 
-    # Hash the new password
-    hashed_new_password = security.get_password_hash(request.new_password)
+#     # Hash the new password
+#     hashed_new_password = security.get_password_hash(request.new_password)
 
-    # Update the password in the database
-    user.hashed_password = hashed_new_password
-    db.commit()
+#     # Update the password in the database
+#     user.hashed_password = hashed_new_password
+#     db.commit()
 
-    return {"message": "Password updated successfully"}
+#     return {"message": "Password updated successfully"}
 
 app.include_router(admin_router)
 app.include_router(user_router)

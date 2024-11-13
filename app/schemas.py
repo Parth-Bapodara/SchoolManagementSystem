@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta
@@ -147,39 +147,15 @@ class WeeklyReportResponse(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     email: str
-    reset_code: int
+
+class PasswordResetVerify(BaseModel):
+    email: EmailStr
+    code: str
+
+class PasswordUpdate(BaseModel):
+    email: EmailStr
     new_password: str
-
-    # Optional: validate password complexity
-    @validator("new_password")
-    def validate_password(cls, password):
-        # Minimum password length
-        if len(password) < 8:
-            raise ValueError("Password must be at least 8 characters long.")
-        # Must contain at least one digit
-        if not any(char.isdigit() for char in password):
-            raise ValueError("Password must contain at least one digit.")
-        # Must contain at least one uppercase letter
-        if not any(char.isupper() for char in password):
-            raise ValueError("Password must contain at least one uppercase letter.")
-        return password
-
-    # Validate reset code to ensure it's a 6-digit number
-    @validator("reset_code")
-    def validate_reset_code(cls, code):
-        if not (100000 <= code <= 999999):
-            raise ValueError("Reset code must be a 6-digit number.")
-        return code
-
-
-class PasswordResetTokenRequest(BaseModel):
-    user_id: int
-
-#to change users password
-class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., min_length=8, max_length=128)
-    new_password: str = Field(..., min_length=8, max_length=128)
-    confirm_new_password: str = Field(..., min_length=8, max_length=128)
+    confirm_password: str
 
     # Optional: validate password complexity
     @validator("new_password")
