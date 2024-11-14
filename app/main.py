@@ -86,9 +86,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         )
     user_data = {"user_id": user.id, "role": user.role}
     access_token = security.create_access_token(data=user_data)
-    # access_token = security.create_access_token(data={"sub": str(user.id), "role": user.role})
-    return {"access_token": access_token, "token_type": "bearer"}
 
+    # access_token = security.create_access_token(data={"sub": str(user.id), "role": user.role})
+    return {"access_token": access_token, "token_type": "bearer", "Mail":user.email, "ID": user.id, "Username":user.username, "Role":user.role, "Status": user.status}
     
 # Retrieve User Info
 @user_router.get("/user/me", response_model=UserInDb)
@@ -98,7 +98,7 @@ async def read_user_info(db: Session = Depends(get_db), token: str = Depends(oau
     except JWTError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
 
-    user_id = int(user_data.get("sub"))
+    user_id = int(user_data.get("user_id"))
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
@@ -116,7 +116,7 @@ async def update_user_info(
     except JWTError:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
 
-    user_id = int(user_data.get("sub"))
+    user_id = int(user_data.get("user_id"))
     current_user = db.query(User).filter(User.id == user_id).first()
     if not current_user:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -140,14 +140,14 @@ async def get_all_students(db: Session = Depends(get_db), token: str = Depends(o
     if user_data["role"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view students."
+            detail="Not authorized to view students, Only admin can see this Information"
         )
 
     students = db.query(User).filter(User.role == "student").all()
     if not students:
         return {"msg": "No students found."}
 
-    return [{"email": student.email, "role": student.role, "ID": student.id} for student in students]
+    return [{"email": student.email, "role": student.role, "ID": student.id, "User_name": student.username, "Status": student.status} for student in students]
 
 # Get All Teachers (Admin-only)
 @user_router.get("/teachers/")
@@ -160,14 +160,14 @@ async def get_all_teachers(db: Session = Depends(get_db), token: str = Depends(o
     if user_data["role"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to view teachers."
+            detail="Not authorized to view teachers, Only admin can see this Information"
         )
 
     teachers = db.query(User).filter(User.role == "teacher").all()
     if not teachers:
         return {"msg": "No teachers found."}
 
-    return [{"email": teacher.email, "role": teacher.role, "ID": teacher.id} for teacher in teachers]
+    return [{"email": teacher.email, "role": teacher.role, "ID": teacher.id, "User_name": teacher.username, "Status": teacher.status} for teacher in teachers]
 
 @exam_router.post("/classes/")
 async def create_class(class_data:ClassCreate, db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
@@ -179,7 +179,7 @@ async def create_class(class_data:ClassCreate, db:Session = Depends(get_db), tok
     db.add(new_class)
     db.commit()
     db.refresh(new_class)
-    return {"msg": "Class created successfully", "class_id": new_class.id}
+    return {"msg": "Class created successfully", "class_id": new_class.id, "name": new_class.name}
 
 @exam_router.post("/subjects/")
 async def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
@@ -191,7 +191,7 @@ async def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_
     db.add(new_subject)
     db.commit()
     db.refresh(new_subject)
-    return {"msg": "Subject created successfully", "subject_id": new_subject.id}
+    return {"msg": "Subject created successfully", "subject_id": new_subject.id, "name": new_subject.name}
 
 @exam_router.post("/exams/")
 async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token: str= Depends(oauth2_scheme)):
@@ -327,23 +327,19 @@ async def take_exam(exam_id: int, answers: str, db: Session = Depends(get_db), t
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can take exams.")
     
-    # Check if the exam is available (status is "scheduled")
     exam = db.query(models.Exam).filter(models.Exam.id == exam_id, models.Exam.status == "scheduled").first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not available or already started/completed.")
 
-    # Check if the student has already submitted the exam
     existing_submission = db.query(models.ExamSubmission).filter(models.ExamSubmission.exam_id == exam_id, models.ExamSubmission.student_id == user_data["user_id"]).first()
     if existing_submission:
         raise HTTPException(status_code=400, detail="You have already submitted this exam.")
 
-    # Create a new exam submission
     submission = models.ExamSubmission(exam_id=exam_id, student_id=user_data["user_id"], answers=answers)
     db.add(submission)
     db.commit()
-    db.refresh(submission)  # To get the actual ID and updated data from DB
-
-    # Return a success message along with submission details, placing submission_id before or after the message
+    db.refresh(submission)  
+    
     return {
         "message": "Exam submitted successfully.",
         "submission_id": submission.id  # You can switch positions of message and submission_id here
@@ -428,13 +424,10 @@ async def password_reset_request(data: schemas.PasswordResetRequest, db: Session
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Generate the reset code
     reset_code = config.generate_verification_code()
 
-    # Set the expiry time (e.g., 15 minutes from now)
     expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
-    # Store the reset code and expiry time in the PasswordResetRequest table
     reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
     db.add(reset_request)
     db.commit()
@@ -459,22 +452,17 @@ async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depend
         raise HTTPException(status_code=404, detail="User not found")
 
     if data.new_password != data.confirm_password:
-        raise HTTPException(status_code=400, detail="Passwords do not match")
+        raise HTTPException(status_code=400, detail="new Password and Confirm Password do not match")
 
     if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
 
-    # Update the user's password
     user.password = security.get_password_hash(data.new_password)
-    
-    # Commit the changes to the database
     db.commit()
-
-    # Optionally, delete the reset code from the PasswordResetRequest table after successful password update (clean-up)
     db.delete(reset_request)
     db.commit()
 
-    return {"message": "Password reset successful"}
+    return {"message": "Password reset successfully."}
 
 @pass_router.post("/password-change/")
 async def change_password(data: schemas.ChangePassword, current_user: models.User = Depends(security.get_current_user), db: Session = Depends(get_db)):
@@ -482,7 +470,7 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
     if not security.pwd_context.verify(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect old password")
     if data.new_password != data.confirm_password:
-        raise HTTPException(status_code=400, detail="New password and confirm password do not match")
+        raise HTTPException(status_code=400, detail="New password and Confirm password do not match")
     if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
 

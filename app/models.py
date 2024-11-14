@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 from .database import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship,DeclarativeBase
 from datetime import datetime, timedelta
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -100,3 +100,6 @@ class PasswordResetRequest(Base):
         self.user_id = user_id
         self.reset_code = reset_code
         self.expiry_time = expiry_time
+
+class Base(DeclarativeBase):
+    pass
