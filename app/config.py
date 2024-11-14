@@ -51,10 +51,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class EmailSettings(BaseModel):
-    MAIL_USERNAME: str = "apikey"
-    MAIL_PASSWORD: str = os.getenv("SENDGRID_API_KEY")
+    MAIL_USERNAME: str = "parth.bapodara@mindinventory.com"
+    MAIL_PASSWORD: str = os.getenv("MAIL_PASSWORD")
     MAIL_FROM: EmailStr = os.getenv("MAIL_FROM")
-    MAIL_SERVER: str = "smtp.sendgrid.net"
+    MAIL_SERVER: str = "smtp.gmail.com"
     MAIL_PORT: int = 587
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
@@ -88,3 +88,15 @@ async def send_verification_email(email: EmailStr, code: str):
     )
     fm = FastMail(conf)
     await fm.send_message(message)
+
+
+# class EmailSettings(BaseModel):
+#     MAIL_USERNAME: str = "apikey"
+#     MAIL_PASSWORD: str = os.getenv("SENDGRID_API_KEY")
+#     MAIL_FROM: EmailStr = os.getenv("MAIL_FROM")
+#     MAIL_SERVER: str = "smtp.sendgrid.net"
+#     MAIL_PORT: int = 587
+#     MAIL_STARTTLS: bool = True
+#     MAIL_SSL_TLS: bool = False
+#     USE_CREDENTIALS: bool = True
+#     VALIDATE_CERTS: bool = True
