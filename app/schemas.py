@@ -103,11 +103,12 @@ class ExamUpdate(BaseModel):
 
     class Config:
         orm_mode = True
-
-#for creation of examsubmission
+        
+#to create new submission for exams
 class ExamSubmissionCreate(BaseModel):
     answers: str
 
+#for recording response of exam submission
 class ExamSubmissionResponse(BaseModel):
     id: int
     exam_id: int
@@ -118,6 +119,7 @@ class ExamSubmissionResponse(BaseModel):
     class Config:
         orm_mode = True
 
+#for grading student marks in exmas
 class ExamGrade(BaseModel):
     marks: float
 
@@ -140,14 +142,16 @@ class AttendanceResponse(BaseModel):
     class Config:
         orm_mode = True
 
+#to get weekly report of users
 class WeeklyReportResponse(BaseModel):
     total_hours_worked: float
     distinct_days_worked: int
 
-
+#to reset user password
 class PasswordResetRequest(BaseModel):
     email: EmailStr
 
+#to verify the generated user request for password reset
 class PasswordResetVerify(BaseModel):
     email: EmailStr
     code: str
@@ -165,6 +169,7 @@ class PasswordResetVerify(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
 
+#to change user password
 class ChangePassword(BaseModel):
     old_password: str
     new_password: str

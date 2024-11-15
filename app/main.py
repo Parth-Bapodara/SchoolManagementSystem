@@ -18,6 +18,7 @@ admin_router = APIRouter(tags=["Admin Management"])
 user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
+sub_router = APIRouter(tags=["Class & Subject Management"])
 app.include_router(attendance.router, prefix="/attendance", tags=["Attendance"])
 
 #for creating default admin if not available upon running system first time 
@@ -147,7 +148,7 @@ async def get_all_students(db: Session = Depends(get_db), token: str = Depends(o
     if not students:
         return {"msg": "No students found."}
 
-    return [{"email": student.email, "role": student.role, "ID": student.id, "User_name": student.username, "Status": student.status} for student in students]
+    return [{"Email": student.email, "Role": student.role, "ID": student.id, "User_name": student.username, "Status": student.status} for student in students]
 
 # Get All Teachers (Admin-only)
 @user_router.get("/teachers/")
@@ -167,9 +168,9 @@ async def get_all_teachers(db: Session = Depends(get_db), token: str = Depends(o
     if not teachers:
         return {"msg": "No teachers found."}
 
-    return [{"email": teacher.email, "role": teacher.role, "ID": teacher.id, "User_name": teacher.username, "Status": teacher.status} for teacher in teachers]
+    return [{"Email": teacher.email, "Role": teacher.role, "ID": teacher.id, "User_name": teacher.username, "Status": teacher.status} for teacher in teachers]
 
-@exam_router.post("/classes/")
+@sub_router.post("/classes/")
 async def create_class(class_data:ClassCreate, db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
     if user_data["role"] not in ["admin","teacher"]:
@@ -181,7 +182,26 @@ async def create_class(class_data:ClassCreate, db:Session = Depends(get_db), tok
     db.refresh(new_class)
     return {"msg": "Class created successfully", "class_id": new_class.id, "name": new_class.name}
 
-@exam_router.post("/subjects/")
+@sub_router.get("/classes/")
+async def get_all_classes(db:Session = Depends(get_db), token:str= Depends(oauth2_scheme)):
+    try:
+        user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
+
+    if user_data["role"] not in ["admin","teacher"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin and teacher can see this Information"
+        )
+    
+    classes = db.query(models.Class).filter().all()
+    if not classes:
+        return {"msg": "No classes found."}
+    
+    return [{"Class-ID": class_.id, "Class_name": class_.name} for class_ in classes]
+
+@sub_router.post("/subjects/")
 async def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
     if user_data["role"] not in ["admin","teacher"]:
@@ -192,6 +212,25 @@ async def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_
     db.commit()
     db.refresh(new_subject)
     return {"msg": "Subject created successfully", "subject_id": new_subject.id, "name": new_subject.name}
+
+@sub_router.get("/Subjects")
+async def get_all_subjects(db:Session = Depends(get_db), token: str =Depends(oauth2_scheme)):
+    try:
+        user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Could not validate credentials")
+
+    if user_data["role"] not in ["admin","teacher"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin and teacher can see this Information"
+        )
+    
+    subjects = db.query(models.Subject).filter().all()
+    if not subjects:
+        return {"msg": "No subjects found."}
+    
+    return [{"Subject-ID": subject_.id, "Subject_name": subject_.name} for subject_ in subjects]
 
 @exam_router.post("/exams/")
 async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token: str= Depends(oauth2_scheme)):
@@ -425,7 +464,6 @@ async def password_reset_request(data: schemas.PasswordResetRequest, db: Session
         raise HTTPException(status_code=404, detail="User not found")
 
     reset_code = config.generate_verification_code()
-
     expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
     reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
@@ -457,7 +495,7 @@ async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depend
     if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
 
-    user.password = security.get_password_hash(data.new_password)
+    user.hashed_password = security.get_password_hash(data.new_password)
     db.commit()
     db.delete(reset_request)
     db.commit()
@@ -474,7 +512,7 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
     if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters long, contain one digit, and one uppercase letter")
 
-    current_user.password = security.pwd_context.hash(data.new_password)
+    current_user.hashed_password = security.pwd_context.hash(data.new_password)
     db.commit()
 
     return {"message": "Password changed successfully"}
@@ -483,3 +521,4 @@ app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(pass_router)
 app.include_router(exam_router)
+app.include_router(sub_router)
