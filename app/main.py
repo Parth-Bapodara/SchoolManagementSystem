@@ -239,6 +239,14 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
         raise HTTPException(status_code=403, detail="Only teachers can create exams.")
     
     exam_date = exam_data.date
+    # var = timedelta(minutes=exam_data.duration)
+    # new_dur = exam_date+var
+
+    # print(exam_date)
+    # print(new_dur)
+    # # if exam_date.tzinfo is None:
+    # #     exam_date = exam_date.replace(tzinfo=timezone.utc)
+
     if exam_date.tzinfo is None:
         exam_date = exam_date.replace(tzinfo=timezone.utc)
     
@@ -265,21 +273,60 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
     db.refresh(new_Exam)
     return new_Exam
 
+# @exam_router.get("/exams/")
+# async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+#     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+#     if user_data["role"] != "student":
+#         raise HTTPException(status_code=403, detail="Only students can view exams.")
+    
+#     # exam_date = exam_data.date.now()
+#     # var = timedelta(minutes=exam_data.duration)
+#     # new_dur = exam_date+var
+
+#     exams = db.query(Exam).join(Subject).join(Class).all()
+
+#     for exam in exams:
+#         if exam.date.tzinfo is None: 
+#             exam.date = exam.date.replace(tzinfo=timezone.utc)
+
+#         exam_end_time = exam.date + timedelta(minutes=exam.duration)
+
+#         if exam_end_time <= datetime.now(timezone.utc) and exam.status == "scheduled":
+#             exam.status = "finished"
+#             db.commit()
+
+#     exams_with_names = [
+#         {
+#             "id": exam.id,
+#             "subject_id": exam.subject_id,
+#             "subject_name": exam.subject.name,
+#             "class_id": exam.class_id,
+#             "class_name": exam.class_.name,
+#             "date": exam.date,
+#             "duration": exam.duration,
+#             "status": exam.status,
+#             "created_by": exam.created_by
+#         } 
+#         for exam in exams
+#     ]
+#     return exams_with_names
+
 @exam_router.get("/exams/")
-async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+async def get_exams(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can view exams.")
     
-    # if user_data["role"] == "student":
-    #     exams= db.query(Exam).filter(Exam.status == "active").all()
-    # else:
-    #     exams=db.query(Exam).all()
-
     exams = db.query(Exam).join(Subject).join(Class).all()
+    current_time = datetime.now(timezone.utc)
 
     for exam in exams:
-        if exam.date <= datetime.utcnow() and exam.status == "scheduled":
+        if exam.date.tzinfo is None:
+            exam.date = exam.date.replace(tzinfo=timezone.utc)  
+        
+        exam_end_time = exam.date + timedelta(minutes=exam.duration)
+
+        if exam_end_time <= current_time and exam.status == "scheduled":
             exam.status = "finished"
             db.commit()
 
@@ -290,11 +337,11 @@ async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_sc
             "subject_name": exam.subject.name,
             "class_id": exam.class_id,
             "class_name": exam.class_.name,
-            "date": exam.date,
+            "date": exam.date.isoformat(), 
             "duration": exam.duration,
             "status": exam.status,
             "created_by": exam.created_by
-        } 
+        }
         for exam in exams
     ]
     return exams_with_names
@@ -417,26 +464,21 @@ async def get_exam_marks(
     db: Session = Depends(get_db), 
     token: str = Depends(oauth2_scheme)
 ):
-    # Decode the token and check the user's role
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
 
-    # Determine the user role and set the student_id accordingly
     student_id = None
     if user_data["role"] == "student":
         student_id = user_data["user_id"]
     elif user_data["role"] == "teacher":
-        student_id = None  # Teachers can view all students' submissions
+        student_id = None  
     else:
         raise HTTPException(status_code=403, detail="Unauthorized access.")
     
-    # Check if the exam exists in the database
     exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found.")
     
-    # Query the exam submission based on user role
     if student_id:
-        # If the user is a student, get their marks for the specified exam
         submission = db.query(ExamSubmission).filter(
             ExamSubmission.exam_id == exam_id,
             ExamSubmission.student_id == student_id
@@ -447,7 +489,6 @@ async def get_exam_marks(
         
         return {"exam_id": exam_id, "marks": submission.marks}
     
-    # If the user is a teacher, get marks for all students
     submissions = db.query(ExamSubmission).filter(ExamSubmission.exam_id == exam_id).all()
     if not submissions:
         raise HTTPException(status_code=404, detail="No submissions found for this exam.")

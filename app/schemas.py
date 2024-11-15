@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field, validator, EmailStr
+from pydantic import BaseModel, Field, validator, EmailStr, model_validator
 from typing import Literal,Optional
 import re
-from datetime import datetime,timedelta
+from datetime import datetime,timedelta,timezone
 
 # User create Schema for user creation
 class UserCreate(BaseModel):
@@ -77,18 +77,27 @@ class ExamCreate(BaseModel):
     date: datetime
     duration: int
 
-#Represents an exam's data as stored in db
 class ExamInDb(BaseModel):
     id: int
     subject_id: int
     subject_name: str
     class_id: int
     class_name: str
-    date: datetime
+    date: datetime 
     duration: int
     created_by: int
     status: str
 
+    @model_validator(mode='after')  
+    def ensure_utc_and_format(cls, values):
+        if 'date' in values:
+            date_obj = values['date']
+            
+            if date_obj.tzinfo is None:
+                values['date'] = date_obj.replace(tzinfo=timezone.utc)
+            values['date'] = values['date'].isoformat()          
+        return values
+    
     class Config:
         orm_mode = True
 
@@ -99,11 +108,11 @@ class ExamUpdate(BaseModel):
     date: Optional[datetime] = None
     duration: Optional[int] = None
     status: Optional[str] = None
-    marks: Optional[float] = None
+    #marks: Optional[float] = None
 
     class Config:
         orm_mode = True
-        
+
 #to create new submission for exams
 class ExamSubmissionCreate(BaseModel):
     answers: str
