@@ -21,8 +21,7 @@ def clock_in_user(db: Session = Depends(database.get_db), current_user: models.U
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Maximum number of clock-ins reached for today."
         )
-    
-    # Create new clock-in entry
+
     attendance = models.Attendance(user_id=current_user.id, clock_in=datetime.utcnow())
     db.add(attendance)
     db.commit()
@@ -65,7 +64,6 @@ def get_weekly_report(db: Session = Depends(database.get_db), current_user: mode
     
     total_hours = sum(attendance.hours_worked for attendance in attendances if attendance.clock_out)
     
-    # Count distinct days worked
     worked_days = {attendance.clock_in.date() for attendance in attendances if attendance.clock_out}
     distinct_days_count = len(worked_days)
     

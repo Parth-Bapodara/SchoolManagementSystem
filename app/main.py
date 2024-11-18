@@ -9,16 +9,23 @@ from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
+import requests
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+
+GOOGLE_CLIENT_ID = "514425638136-k6ej0l6n56fd9ptm1vjuc2039sehqgon.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_REDIRECT_URI = "http://localhost:8000"
 
 admin_router = APIRouter(tags=["Admin Management"])
 user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
+google_router = APIRouter(tags=["Google Auth"])
 app.include_router(attendance.router, prefix="/attendance", tags=["Attendance"])
 
 #for creating default admin if not available upon running system first time 
@@ -239,13 +246,6 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
         raise HTTPException(status_code=403, detail="Only teachers can create exams.")
     
     exam_date = exam_data.date
-    # var = timedelta(minutes=exam_data.duration)
-    # new_dur = exam_date+var
-
-    # print(exam_date)
-    # print(new_dur)
-    # # if exam_date.tzinfo is None:
-    # #     exam_date = exam_date.replace(tzinfo=timezone.utc)
 
     if exam_date.tzinfo is None:
         exam_date = exam_date.replace(tzinfo=timezone.utc)
@@ -558,8 +558,35 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
 
     return {"message": "Password changed successfully"}
 
+
+@app.get("/login/google")
+async def login_google():
+    return {
+        "url": f"https://accounts.google.com/o/oauth2/auth?response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={GOOGLE_REDIRECT_URI}&scope=openid%20profile%20email&access_type=offline"
+    }
+
+@app.get("/auth/google")
+async def auth_google(code: str):
+    token_url = "https://accounts.google.com/o/oauth2/token"
+    data = {
+        "code": code,
+        "client_id": GOOGLE_CLIENT_ID,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uri": GOOGLE_REDIRECT_URI,
+        "grant_type": "authorization_code",
+    }
+    response = requests.post(token_url, data=data)
+    access_token = response.json().get("access_token")
+    user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
+    return user_info.json()
+
+@app.get("/token")
+async def get_token(token: str = Depends(oauth2_scheme)):
+    return jwt.decode(token, GOOGLE_CLIENT_SECRET, algorithms=[security.ALGORITHM])
+
 app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(pass_router)
 app.include_router(exam_router)
 app.include_router(sub_router)
+app.include_router(google_router)
