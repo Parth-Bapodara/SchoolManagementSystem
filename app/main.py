@@ -9,12 +9,14 @@ from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
-from . import auth
 from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth
+from starlette.requests import Request
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")  
+# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") 
 
 app.add_middleware(SessionMiddleware, secret_key=config.GOOGLE_CLIENT_SECRET)
 
@@ -23,8 +25,7 @@ user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
-app.include_router(auth.google_auth_router, prefix="/google_auth", tags=["Google_Authentication"])
-app.include_router(attendance.router, prefix="/attendance", tags=["Attendance"])
+app.include_router(pass_router, prefix="/auth", tags=["Google_Authentication"])
 
 #for creating default admin if not available upon running system first time 
 def init_db():
@@ -458,39 +459,20 @@ async def get_exam_marks(
         for submission in submissions
     ]
 
-# @pass_router.post("/password-reset-request/")
-# async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
-#     user = db.query(User).filter(User.email == data.email).first()
-#     if not user:
-#         raise HTTPException(status_code=404, detail="User not found")
-
-#     reset_code = config.generate_verification_code()
-#     expiry_time = datetime.utcnow() + timedelta(minutes=15)
-
-#     reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
-#     db.add(reset_request)
-#     db.commit()
-
-#     await config.send_verification_email(data.email, reset_code)
-#     return {"message": "Verification code sent to your email"}
-
 @pass_router.post("/password-reset-request/")
 async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
-    if not config.validate_email(data.email):
-        raise HTTPException(status_code=400, detail="Invalid or non-existent email address")
-
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    reset_code = security.generate_verification_code()
+    reset_code = config.generate_verification_code()
     expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
-    reset_request = schemas.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
+    reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
     db.add(reset_request)
     db.commit()
 
-    await security.send_verification_email(data.email, reset_code)
+    await config.send_verification_email(data.email, reset_code)
     return {"message": "Verification code sent to your email"}
 
 @pass_router.post("/password-reset/")
@@ -537,11 +519,49 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
 
     return {"message": "Password changed successfully"}
 
+oauth = OAuth()
+oauth.register(
+    name="google",
+    client_id=config.GOOGLE_CLIENT_ID,
+    client_secret=config.GOOGLE_CLIENT_SECRET,
+    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+    client_kwargs={"scope": "openid email profile"}
+)
+
+@app.get("/google/login")
+async def google_login(request: Request):
+    redirect_uri = config.GOOGLE_REDIRECT_URI
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@app.get("/google/callback")
+async def google_callback(request: Request, db: Session = Depends(get_db)):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user_info = await oauth.google.parse_id_token(request, token)
+
+        email = user_info.get("email")
+        user = db.query(User).filter(User.email == email).first()
+
+        if not user:
+            raise HTTPException(status_code=400, detail="User does not exist. Please register first.")
+
+        return {"message": "Login successful", "user": {"email": email}}
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(pass_router)
 app.include_router(exam_router)
 app.include_router(sub_router)
+
+
+
+
+
+
 
 
 
@@ -610,3 +630,9 @@ app.include_router(sub_router)
 # @app.get("/token")
 # async def get_token(token: str = Depends(oauth2_scheme)):
 #     return jwt.decode(token, GOOGLE_CLIENT_SECRET, algorithms=[security.ALGORITHM])
+
+#@app.get("/login/google")
+# async def login_google():
+#     return {
+#         "url": f"https://accounts.google.com/o/oauth2/auth?response_type=code&client_id={config.GOOGLE_CLIENT_ID}&redirect_uri={config.GOOGLE_REDIRECT_URI}&scope=openid%20profile%20email&access_type=offline"
+#     }

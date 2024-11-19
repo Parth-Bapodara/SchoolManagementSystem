@@ -18,9 +18,6 @@ class EmailSettings(BaseModel):
 
 email_settings = EmailSettings()
 
-def generate_verification_code() -> str:
-    return f"{random.randint(100000, 999999)}"
-
 conf = ConnectionConfig(
     MAIL_USERNAME=email_settings.MAIL_USERNAME,
     MAIL_PASSWORD=email_settings.MAIL_PASSWORD,
@@ -33,16 +30,8 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=email_settings.VALIDATE_CERTS
 )
 
-# Use FastMail to send emails via SendGrid's SMTP server
-async def send_verification_email(email: EmailStr, code: str):
-    message = MessageSchema(
-        subject="Password Reset Code",
-        recipients=[email],
-        body=f"Your password reset code is: {code}",
-        subtype="plain"
-    )
-    fm = FastMail(conf)
-    await fm.send_message(message)
+def generate_verification_code() -> str:
+    return f"{random.randint(100000, 999999)}"
 
 def validate_email(email: str) -> bool:
     try:
@@ -53,9 +42,9 @@ def validate_email(email: str) -> bool:
     except:
         return False
 
-GOOGLE_CLIENT_ID = "514425638136-k6ej0l6n56fd9ptm1vjuc2039sehqgon.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
-GOOGLE_REDIRECT_URI = "http://127.0.0.1:8000/google/callback"
+GOOGLE_CLIENT_ID = "514425638136-3mvsn0f064gc08qs2o2kufkgcc0il6ov.apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET = "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"
+GOOGLE_REDIRECT_URI = "http://127.0.0.1:8000/google/callback/"
 
 # class EmailSettings(BaseModel):
 #     MAIL_USERNAME: str = "apikey"
