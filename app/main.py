@@ -9,23 +9,21 @@ from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
-import requests
+from . import auth
+from starlette.middleware.sessions import SessionMiddleware
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
-GOOGLE_CLIENT_ID = "514425638136-k6ej0l6n56fd9ptm1vjuc2039sehqgon.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
-GOOGLE_REDIRECT_URI = "http://localhost:8000"
+app.add_middleware(SessionMiddleware, secret_key=config.GOOGLE_CLIENT_SECRET)
 
 admin_router = APIRouter(tags=["Admin Management"])
 user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
-google_router = APIRouter(tags=["Google Auth"])
+app.include_router(auth.google_auth_router, prefix="/google_auth", tags=["Google_Authentication"])
 app.include_router(attendance.router, prefix="/attendance", tags=["Attendance"])
 
 #for creating default admin if not available upon running system first time 
@@ -273,44 +271,6 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
     db.refresh(new_Exam)
     return new_Exam
 
-# @exam_router.get("/exams/")
-# async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
-#     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-#     if user_data["role"] != "student":
-#         raise HTTPException(status_code=403, detail="Only students can view exams.")
-    
-#     # exam_date = exam_data.date.now()
-#     # var = timedelta(minutes=exam_data.duration)
-#     # new_dur = exam_date+var
-
-#     exams = db.query(Exam).join(Subject).join(Class).all()
-
-#     for exam in exams:
-#         if exam.date.tzinfo is None: 
-#             exam.date = exam.date.replace(tzinfo=timezone.utc)
-
-#         exam_end_time = exam.date + timedelta(minutes=exam.duration)
-
-#         if exam_end_time <= datetime.now(timezone.utc) and exam.status == "scheduled":
-#             exam.status = "finished"
-#             db.commit()
-
-#     exams_with_names = [
-#         {
-#             "id": exam.id,
-#             "subject_id": exam.subject_id,
-#             "subject_name": exam.subject.name,
-#             "class_id": exam.class_id,
-#             "class_name": exam.class_.name,
-#             "date": exam.date,
-#             "duration": exam.duration,
-#             "status": exam.status,
-#             "created_by": exam.created_by
-#         } 
-#         for exam in exams
-#     ]
-#     return exams_with_names
-
 @exam_router.get("/exams/")
 async def get_exams(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
@@ -498,20 +458,39 @@ async def get_exam_marks(
         for submission in submissions
     ]
 
+# @pass_router.post("/password-reset-request/")
+# async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+#     user = db.query(User).filter(User.email == data.email).first()
+#     if not user:
+#         raise HTTPException(status_code=404, detail="User not found")
+
+#     reset_code = config.generate_verification_code()
+#     expiry_time = datetime.utcnow() + timedelta(minutes=15)
+
+#     reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
+#     db.add(reset_request)
+#     db.commit()
+
+#     await config.send_verification_email(data.email, reset_code)
+#     return {"message": "Verification code sent to your email"}
+
 @pass_router.post("/password-reset-request/")
 async def password_reset_request(data: schemas.PasswordResetRequest, db: Session = Depends(get_db)):
+    if not config.validate_email(data.email):
+        raise HTTPException(status_code=400, detail="Invalid or non-existent email address")
+
     user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    reset_code = config.generate_verification_code()
+    reset_code = security.generate_verification_code()
     expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
-    reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
+    reset_request = schemas.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
     db.add(reset_request)
     db.commit()
 
-    await config.send_verification_email(data.email, reset_code)
+    await security.send_verification_email(data.email, reset_code)
     return {"message": "Verification code sent to your email"}
 
 @pass_router.post("/password-reset/")
@@ -558,35 +537,76 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
 
     return {"message": "Password changed successfully"}
 
-
-@app.get("/login/google")
-async def login_google():
-    return {
-        "url": f"https://accounts.google.com/o/oauth2/auth?response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={GOOGLE_REDIRECT_URI}&scope=openid%20profile%20email&access_type=offline"
-    }
-
-@app.get("/auth/google")
-async def auth_google(code: str):
-    token_url = "https://accounts.google.com/o/oauth2/token"
-    data = {
-        "code": code,
-        "client_id": GOOGLE_CLIENT_ID,
-        "client_secret": GOOGLE_CLIENT_SECRET,
-        "redirect_uri": GOOGLE_REDIRECT_URI,
-        "grant_type": "authorization_code",
-    }
-    response = requests.post(token_url, data=data)
-    access_token = response.json().get("access_token")
-    user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
-    return user_info.json()
-
-@app.get("/token")
-async def get_token(token: str = Depends(oauth2_scheme)):
-    return jwt.decode(token, GOOGLE_CLIENT_SECRET, algorithms=[security.ALGORITHM])
-
 app.include_router(admin_router)
 app.include_router(user_router)
 app.include_router(pass_router)
 app.include_router(exam_router)
 app.include_router(sub_router)
-app.include_router(google_router)
+
+
+
+
+
+# @exam_router.get("/exams/")
+# async def get_exams(db:Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
+#     user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
+#     if user_data["role"] != "student":
+#         raise HTTPException(status_code=403, detail="Only students can view exams.")
+    
+#     # exam_date = exam_data.date.now()
+#     # var = timedelta(minutes=exam_data.duration)
+#     # new_dur = exam_date+var
+
+#     exams = db.query(Exam).join(Subject).join(Class).all()
+
+#     for exam in exams:
+#         if exam.date.tzinfo is None: 
+#             exam.date = exam.date.replace(tzinfo=timezone.utc)
+
+#         exam_end_time = exam.date + timedelta(minutes=exam.duration)
+
+#         if exam_end_time <= datetime.now(timezone.utc) and exam.status == "scheduled":
+#             exam.status = "finished"
+#             db.commit()
+
+#     exams_with_names = [
+#         {
+#             "id": exam.id,
+#             "subject_id": exam.subject_id,
+#             "subject_name": exam.subject.name,
+#             "class_id": exam.class_id,
+#             "class_name": exam.class_.name,
+#             "date": exam.date,
+#             "duration": exam.duration,
+#             "status": exam.status,
+#             "created_by": exam.created_by
+#         } 
+#         for exam in exams
+#     ]
+#     return exams_with_names
+
+
+# @app.get("/login/google")
+# async def login_google():
+#     return {
+#         "url": f"https://accounts.google.com/o/oauth2/auth?response_type=code&client_id={GOOGLE_CLIENT_ID}&redirect_uri={GOOGLE_REDIRECT_URI}&scope=openid%20profile%20email&access_type=offline"
+#     }
+
+# @app.get("/auth/google")
+# async def auth_google(code: str):
+#     token_url = "https://accounts.google.com/o/oauth2/token"
+#     data = {
+#         "code": code,
+#         "client_id": GOOGLE_CLIENT_ID,
+#         "client_secret": GOOGLE_CLIENT_SECRET,
+#         "redirect_uri": GOOGLE_REDIRECT_URI,
+#         "grant_type": "authorization_code",
+#     }
+#     response = requests.post(token_url, data=data)
+#     access_token = response.json().get("access_token")
+#     user_info = requests.get("https://www.googleapis.com/oauth2/v1/userinfo", headers={"Authorization": f"Bearer {access_token}"})
+#     return user_info.json()
+
+# @app.get("/token")
+# async def get_token(token: str = Depends(oauth2_scheme)):
+#     return jwt.decode(token, GOOGLE_CLIENT_SECRET, algorithms=[security.ALGORITHM])
