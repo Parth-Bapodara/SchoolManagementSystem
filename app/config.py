@@ -2,6 +2,7 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import BaseModel, EmailStr
 import random,os,smtplib
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 load_dotenv()
 
@@ -41,10 +42,10 @@ def validate_email(email: str) -> bool:
         return True
     except:
         return False
+    
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-GOOGLE_CLIENT_ID = "514425638136-3mvsn0f064gc08qs2o2kufkgcc0il6ov.apps.googleusercontent.com"
-GOOGLE_CLIENT_SECRET = "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"
-GOOGLE_REDIRECT_URI = "http://127.0.0.1:8000/google/callback/"
 
 # class EmailSettings(BaseModel):
 #     MAIL_USERNAME: str = "apikey"

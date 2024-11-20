@@ -1,5 +1,6 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from .models import User, Class, Exam, Subject, ExamSubmission
 from .schemas import UserCreate, UserInDb, UserUpdate, ClassCreate, SubjectCreate, ExamCreate, ExamInDb, ExamUpdate
@@ -9,16 +10,17 @@ from jose import jwt, JWTError
 from fastapi import APIRouter
 from . import models,schemas,database,crud,config
 from datetime import timedelta, datetime, timezone
+from fastapi.templating import Jinja2Templates
+from app.routers.auth import router as auth_router 
 from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth
-from starlette.requests import Request
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")  
-# oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") 
 
-app.add_middleware(SessionMiddleware, secret_key=config.GOOGLE_CLIENT_SECRET)
+app.add_middleware(SessionMiddleware, secret_key="RANDOM_KEY")
+
+templates = Jinja2Templates(directory="app/templates")
 
 admin_router = APIRouter(tags=["Admin Management"])
 user_router = APIRouter(tags=["User Retrieval"])
@@ -26,6 +28,7 @@ exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
 app.include_router(pass_router, prefix="/auth", tags=["Google_Authentication"])
+app.include_router(auth_router, prefix="/auth")
 
 #for creating default admin if not available upon running system first time 
 def init_db():
@@ -91,11 +94,11 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user_data = {"user_id": user.id, "role": user.role}
+    user_data = {"user_id": user.id, "role": user.role, "Mail":user.email, "Username":user.username, "Status": user.status}
     access_token = security.create_access_token(data=user_data)
 
     # access_token = security.create_access_token(data={"sub": str(user.id), "role": user.role})
-    return {"access_token": access_token, "token_type": "bearer", "Mail":user.email, "ID": user.id, "Username":user.username, "Role":user.role, "Status": user.status}
+    return {"access_token": access_token, "token_type": "bearer", "User_Data": user_data}
     
 # Retrieve User Info
 @user_router.get("/user/me", response_model=UserInDb)
@@ -519,37 +522,37 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
 
     return {"message": "Password changed successfully"}
 
-oauth = OAuth()
-oauth.register(
-    name="google",
-    client_id=config.GOOGLE_CLIENT_ID,
-    client_secret=config.GOOGLE_CLIENT_SECRET,
-    server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
-    client_kwargs={"scope": "openid email profile"}
-)
+# oauth = OAuth()
+# oauth.register(
+#     name="google",
+#     client_id=config.GOOGLE_CLIENT_ID,
+#     client_secret=config.GOOGLE_CLIENT_SECRET,
+#     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+#     client_kwargs={"scope": "openid email profile"}
+# )
 
-@app.get("/google/login")
-async def google_login(request: Request):
-    redirect_uri = config.GOOGLE_REDIRECT_URI
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+# @app.get("/google/login")
+# async def google_login(request: Request):
+#     redirect_uri = config.GOOGLE_REDIRECT_URI
+#     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 
-@app.get("/google/callback")
-async def google_callback(request: Request, db: Session = Depends(get_db)):
-    try:
-        token = await oauth.google.authorize_access_token(request)
-        user_info = await oauth.google.parse_id_token(request, token)
+# @app.get("/google/callback")
+# async def google_callback(request: Request, db: Session = Depends(get_db)):
+#     try:
+#         token = await oauth.google.authorize_access_token(request)
+#         user_info = await oauth.google.parse_id_token(request, token)
 
-        email = user_info.get("email")
-        user = db.query(User).filter(User.email == email).first()
+#         email = user_info.get("email")
+#         user = db.query(User).filter(User.email == email).first()
 
-        if not user:
-            raise HTTPException(status_code=400, detail="User does not exist. Please register first.")
+#         if not user:
+#             raise HTTPException(status_code=400, detail="User does not exist. Please register first.")
 
-        return {"message": "Login successful", "user": {"email": email}}
+#         return {"message": "Login successful", "user": {"email": email}}
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 app.include_router(admin_router)
 app.include_router(user_router)

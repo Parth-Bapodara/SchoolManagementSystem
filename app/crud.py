@@ -56,18 +56,12 @@ def get_total_work_hours(db: Session, user_id: int) -> str:
     return f"{hours}h {minutes}m"
 
 def update_exam_submission_marks(db: Session, submission_id: int, marks: float):
-    # Retrieve the ExamSubmission from the database by ID
     submission = db.query(models.ExamSubmission).filter(models.ExamSubmission.id == submission_id).first()
     
     if submission:
-        # Update the marks field
         submission.marks = marks
-        
-        # Commit the transaction to the database
         db.commit()
-        
-        # Refresh the submission object to reflect the updated data from the DB
         db.refresh(submission)
         
         return submission
-    return None  # Return None if the submission was not found
+    return None  
