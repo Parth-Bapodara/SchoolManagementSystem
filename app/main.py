@@ -18,7 +18,7 @@ app = FastAPI()
 Base.metadata.create_all(bind=engine)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")  
 
-app.add_middleware(SessionMiddleware, secret_key="RANDOM_KEY")
+app.add_middleware(SessionMiddleware, secret_key=config.GOOGLE_CLIENT_SECRET)
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -27,8 +27,7 @@ user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
-app.include_router(pass_router, prefix="/auth", tags=["Google_Authentication"])
-app.include_router(auth_router, prefix="/auth")
+app.include_router(auth_router)
 
 #for creating default admin if not available upon running system first time 
 def init_db():

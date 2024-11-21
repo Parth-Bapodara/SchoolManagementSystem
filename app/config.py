@@ -46,7 +46,6 @@ def validate_email(email: str) -> bool:
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
-
 # class EmailSettings(BaseModel):
 #     MAIL_USERNAME: str = "apikey"
 #     MAIL_PASSWORD: str = os.getenv("SENDGRID_API_KEY")
