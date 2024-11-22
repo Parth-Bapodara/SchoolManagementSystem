@@ -1,5 +1,5 @@
 from authlib.integrations.starlette_client import OAuth
-from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+from Config.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
 
 oauth = OAuth()
 oauth.register(

@@ -1,8 +1,8 @@
+
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
-from .database import Base
-from sqlalchemy.orm import relationship,DeclarativeBase
+from database.base import Base
+from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
-from sqlalchemy.ext.declarative import declarative_base
 
 #DB model representing a user with diffrent fields.
 class User(Base):
@@ -71,7 +71,7 @@ class Attendance(Base):
             return(self.clock_out-self.clock_in).total_seconds()/3600
         return 0
     
-#to track and manage student marks
+#DB model to track and manage student marks
 class ExamSubmission(Base):
     __tablename__ = "exam_submissions"
 
@@ -84,7 +84,7 @@ class ExamSubmission(Base):
     exam = relationship("Exam", back_populates="submissions")
     student = relationship("User", back_populates="exam_submissions")
 
-#to perform password reset functionality
+#DB model to execute password reset functionality
 class PasswordResetRequest(Base):
     __tablename__ = "password_reset_requests"
 
@@ -101,5 +101,5 @@ class PasswordResetRequest(Base):
         self.reset_code = reset_code
         self.expiry_time = expiry_time
 
-class Base(DeclarativeBase):
-    pass
+# class Base(DeclarativeBase):
+#     pass

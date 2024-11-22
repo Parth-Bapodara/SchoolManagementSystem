@@ -1,97 +1,97 @@
-from fastapi import APIRouter, Depends, Request,HTTPException
-from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.security import OAuth2PasswordBearer
 from app.google_auth import oauth
-from app.models import User
-from app.database import get_db
-from fastapi.templating import Jinja2Templates
+from src.api.v1.authentication.security import JWTBearer,create_access_token,decode_access_token,token_response
 
 router = APIRouter()
 
-templates = Jinja2Templates(directory="app/templates") 
-
-@router.get("/login")
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @router.get("/login/google")
 async def google_login(request: Request):
     redirect_uri = "http://127.0.0.1:8000/google/callback"
-    print("Redirect_uri:", redirect_uri)
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @router.get("/google/callback")
-async def google_callback(request: Request, db: Session = Depends(get_db)):
-    code = request.query_params.get("code")
-    print(f"Received code: {code}, (type: {type(code)}")
-    
-    if not code:
-        raise HTTPException(status_code=400, detail="Authorization code is missing.")
-    
+async def google_callback(request: Request):
     try:
-        token = await oauth.google.fetch_access_token(code=code)
-        print(f"Token response: {token}")
+        token = await oauth.google.authorize_access_token(request)
         user_info = await oauth.google.get("https://www.googleapis.com/oauth2/v3/userinfo", token=token)
-        
-        if not user_info.ok:
+
+        if user_info.status_code != 200:
             raise HTTPException(status_code=400, detail="Failed to fetch user information from Google.")
 
-        user_data = user_info.json() 
-        email = user_data.get("email")
-        name = user_data.get("name")
-
-        if not email or not name:
-            raise HTTPException(status_code=400, detail="Missing email or name in user info.")
+        user_data = user_info.json()
         
-        user = db.query(User).filter(User.email == email).first()
-
-        if not user:
-            # user = User(email=email, name=name)
-            # db.add(user)
-            # db.commit()
-            pass
-
-        return {"message": "Login successful", "user": {"email": email, "name": name}}
+        return {"access_token": token.get("access_token"), "token_type": "bearer"}
 
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error occurred while processing the authorization code: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Error occurred: {str(e)}")
 
-# @router.get("/google/callback")
-# async def google_callback(request: Request, db: Session = Depends(get_db)):
-#     token = await oauth.google.authorize_access_token(request)
-#     user_info = token.get("userinfo")
+@router.get("/protected-endpoint")
+async def protected_endpoint(token: str = Depends(JWTBearer())):
+    """
+    A secured endpoint that requires a valid JWT token.
+    """
+    try:
+        payload = decode_access_token(token)
+        return {"message": "Token is valid", "payload": payload}
+    except HTTPException as e:
+        raise e
 
-#     if user_info:
-#         email = user_info.get("email")
-#         name = user_info.get("name")
+@router.get("/secure-data")
+async def secure_data(token: str = Depends(JWTBearer())):
+    return {"message": "This is secured data, you have a valid token!"}
+
+
+# @router.get("/google/callback", response_class=HTMLResponse)
+# async def google_callback(request: Request):
+#     code = request.query_params.get("code")
+#     print(f"Received code: {code}")
+
+#     if not code:
+#         raise HTTPException(status_code=400, detail="Authorization code is missing.")
+
+#     html_content = f"""
+#     <html>
+#         <head>
+#             <title>Authorization Code</title>
+#         </head>
+#         <body>
+#             <h2>Your Google Authorization Code</h2>
+#             <p><strong>Code:</strong> {code}</p>
+#             <p>Use this code in the <strong>/google/callback</strong> endpoint via Swagger UI.</p>
+#             <p>Redirecting to the documentation page...</p>
+#             <script>
+#                 setTimeout(function() {{
+#                     window.location.href = "/docs";
+#                 }}, 10000); // Redirect after 10 seconds
+#             </script>
+#         </body>
+#     </html>
+#     """
+#     return HTMLResponse(content=html_content)
+
+# # @router.get("/google/callback")
+# # async def google_callback(request: Request, db: Session = Depends(get_db)):
+# #     token = await oauth.google.authorize_access_token(request)
+# #     user_info = token.get("userinfo")
+
+# #     if user_info:
+# #         email = user_info.get("email")
+# #         name = user_info.get("name")
     
-#         if email and name:
-#             user = db.query(User).filter(User.email == email).first()
-#             if not user:
-#                 # user = User(email=email, username=name)
-#                 # db.add(user)
-#                 # db.commit()
-#                 pass    
-#             return {"message": "Login successful", "user": {"email": email, "name": name}}
-#         else:
-#             raise HTTPException(status_code=400, detail="Invalid user info")
-#     else:
-#         raise HTTPException(status_code=400, detail="No user info found in the token")
+# #         if email and name:
+# #             user = db.query(User).filter(User.email == email).first()
+# #             if not user:
+# #                 # user = User(email=email, username=name)
+# #                 # db.add(user)
+# #                 # db.commit()
+# #                 pass    
+# #             return {"message": "Login successful", "user": {"email": email, "name": name}}
+# #         else:
+# #             raise HTTPException(status_code=400, detail="Invalid user info")
+# #     else:
+# #         raise HTTPException(status_code=400, detail="No user info found in the token")
 
 
-
-
-
-# @router.get("/auth/google/callback")
-# async def google_callback(request: Request, db: Session = Depends(get_db)):
-#     token = await oauth.google.authorize_access_token(request)
-#     user_info = await oauth.google.parse_id_token(request, token)
-    
-#     user = db.query(User).filter(User.email == user_info["email"]).first()
-    
-#     if not user:
-#         user = User(email=user_info["email"], name=user_info["name"])
-#         db.add(user)
-#         db.commit()
-
-#     return {"message": "Login successful", "user": {"email": user.email}}

@@ -3,6 +3,9 @@ from pydantic import BaseModel, EmailStr
 import random,os,smtplib
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from typing import Any
 
 load_dotenv()
 
@@ -42,10 +45,36 @@ def validate_email(email: str) -> bool:
         return True
     except:
         return False
-    
+
+async def send_verification_email(recipient_email: str, reset_code: str) -> None:
+    """Send a password reset email with a verification code."""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = email_settings.MAIL_FROM
+        msg['To'] = recipient_email
+        msg['Subject'] = "Password Reset Verification Code"
+
+        body = f"Your verification code is: {reset_code}. This code will expire in 15 minutes."
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Sending the email
+        with smtplib.SMTP(email_settings.MAIL_SERVER, email_settings.MAIL_PORT) as server:
+            server.starttls()
+            server.login(email_settings.MAIL_USERNAME, email_settings.MAIL_PASSWORD)
+            text = msg.as_string()
+            server.sendmail(email_settings.MAIL_FROM, recipient_email, text)
+
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+        raise Exception("Failed to send verification email.")
+
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 
+
+
+
+#sendgrid code 
 # class EmailSettings(BaseModel):
 #     MAIL_USERNAME: str = "apikey"
 #     MAIL_PASSWORD: str = os.getenv("SENDGRID_API_KEY")

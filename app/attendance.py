@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from . import schemas, models, database, security
+from src.api.v1.authentication import security
+from src.api.v1.schemas import schemas
+from src.api.v1.models import models
+from Database import database
 from typing import List
 
 router = APIRouter()

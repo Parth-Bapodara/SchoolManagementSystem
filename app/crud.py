@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from . import models
+from src.api.v1.models import models
 from datetime import datetime, timedelta
 
 # Clock in user with max limit check

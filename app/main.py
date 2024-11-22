@@ -1,18 +1,22 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi import FastAPI, Depends, HTTPException, status, Request, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
-from .models import User, Class, Exam, Subject, ExamSubmission
-from .schemas import UserCreate, UserInDb, UserUpdate, ClassCreate, SubjectCreate, ExamCreate, ExamInDb, ExamUpdate
-from .database import get_db, Base, engine
-from . import security,attendance
+from src.api.v1.models.models import User, Class, Exam, Subject, ExamSubmission
+from src.api.v1.schemas.schemas import UserCreate, UserInDb, UserUpdate, ClassCreate, SubjectCreate, ExamCreate, ExamInDb, ExamUpdate
+from Database.database import get_db, Base, engine
 from jose import jwt, JWTError
-from fastapi import APIRouter
-from . import models,schemas,database,crud,config
+from . import crud
+from Config import config
+from src.api.v1.models import models
+from src.api.v1.schemas import schemas
+from src.api.v1.authentication import security
 from datetime import timedelta, datetime, timezone
 from fastapi.templating import Jinja2Templates
 from app.routers.auth import router as auth_router 
 from starlette.middleware.sessions import SessionMiddleware
+from app.attendance import router as attendance_router
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -27,7 +31,11 @@ user_router = APIRouter(tags=["User Retrieval"])
 exam_router = APIRouter(tags=["Exam Management"])
 pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
-app.include_router(auth_router)
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
 #for creating default admin if not available upon running system first time 
 def init_db():
@@ -86,7 +94,7 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db), token: st
 # Admin and User Login
 @admin_router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    user = db.query(User).filter(User.email == form_data.username).first() or db.query(User).filter(User.username == form_data.username).first()
     if not user or not security.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -521,6 +529,10 @@ async def change_password(data: schemas.ChangePassword, current_user: models.Use
 
     return {"message": "Password changed successfully"}
 
+
+
+
+
 # oauth = OAuth()
 # oauth.register(
 #     name="google",
@@ -558,7 +570,8 @@ app.include_router(user_router)
 app.include_router(pass_router)
 app.include_router(exam_router)
 app.include_router(sub_router)
-
+app.include_router(attendance_router, tags=["Attendence Management"])
+app.include_router(auth_router, tags=["Google Authentication"])
 
 
 

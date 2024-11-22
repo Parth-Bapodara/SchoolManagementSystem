@@ -7,14 +7,17 @@ from datetime import datetime,timedelta,timezone
 class UserCreate(BaseModel):
     email: str 
     username: str 
-    password: str = Field(..., min_length=8)
+    password: str = Field(...)
     role: Literal["student", "teacher", "admin"]
 
     @validator('password')
     def password_complexity(cls,value):
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
-            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")
+            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character ")
+        if len(value) < 8:
+            raise ValueError("Password should be minimum of 8 Characters.")
         return value
+
     
     @validator('username')
     def username_complexity(cls,value):
@@ -77,6 +80,7 @@ class ExamCreate(BaseModel):
     date: datetime
     duration: int
 
+#To check if the exam is present in DB or not
 class ExamInDb(BaseModel):
     id: int
     subject_id: int
@@ -195,5 +199,6 @@ class ChangePassword(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
 
+#to pass simple message
 class Message(BaseModel):
     message:str
