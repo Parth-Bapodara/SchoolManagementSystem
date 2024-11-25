@@ -1,13 +1,14 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from src.api.v1.models.models import User, Class, Exam, Subject, ExamSubmission
+from src.api.v1.user.models.user_models import User
+from src.api.v1.user.models.forgot_password import PasswordResetRequest
+from src.api.v1.exam.models.exam_models import Class,Exam,Subject,ExamSubmission
 from src.api.v1.schemas.schemas import UserCreate, UserInDb, UserUpdate, ClassCreate, SubjectCreate, ExamCreate, ExamInDb, ExamUpdate
 from Database.database import get_db, Base, engine
 from jose import jwt, JWTError
 from . import crud
 from Config import config
-from src.api.v1.models import models
 from src.api.v1.schemas import schemas
 from src.api.v1.authentication import security
 from datetime import timedelta, datetime, timezone
@@ -15,8 +16,6 @@ from fastapi.templating import Jinja2Templates
 from app.routers.auth import router as auth_router 
 from starlette.middleware.sessions import SessionMiddleware
 from app.attendance import router as attendance_router
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
@@ -33,9 +32,9 @@ pass_router = APIRouter(tags=["Password Management"])
 sub_router = APIRouter(tags=["Class & Subject Management"])
 
 
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+# @app.get("/login", response_class=HTMLResponse)
+# async def login_page(request: Request):
+#     return templates.TemplateResponse("login.html", {"request": request})
 
 #for creating default admin if not available upon running system first time 
 def init_db():
@@ -211,7 +210,7 @@ async def get_all_classes(db:Session = Depends(get_db), token:str= Depends(oauth
             detail="Only admin and teacher can see this Information"
         )
     
-    classes = db.query(models.Class).filter().all()
+    classes = db.query(Class).filter().all()
     if not classes:
         return {"msg": "No classes found."}
     
@@ -242,7 +241,7 @@ async def get_all_subjects(db:Session = Depends(get_db), token: str =Depends(oau
             detail="Only admin and teacher can see this Information"
         )
     
-    subjects = db.query(models.Subject).filter().all()
+    subjects = db.query(Subject).filter().all()
     if not subjects:
         return {"msg": "No subjects found."}
     
@@ -262,11 +261,11 @@ async def create_Exam(exam_data: ExamCreate, db:Session =Depends(get_db), token:
     if exam_date<datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Cannot create an exam with a past date or time.")
 
-    subject = db.query(models.Subject).filter(models.Subject.id == exam_data.subject_id).first()
+    subject = db.query(Subject).filter(Subject.id == exam_data.subject_id).first()
     if not subject:
         raise HTTPException(status_code=404, detail="Subject not found")
     
-    class_ = db.query(models.Class).filter(models.Class.id == exam_data.class_id).first()
+    class_ = db.query(Class).filter(Class.id == exam_data.class_id).first()
     if not class_:
         raise HTTPException(status_code=404, detail="Class not found")
     
@@ -384,22 +383,22 @@ async def take_exam(exam_id: int, answers: str, db: Session = Depends(get_db), t
     if user_data["role"] != "student":
         raise HTTPException(status_code=403, detail="Only students can take exams.")
     
-    exam = db.query(models.Exam).filter(models.Exam.id == exam_id, models.Exam.status == "scheduled").first()
+    exam = db.query(Exam).filter(Exam.id == exam_id, Exam.status == "scheduled").first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not available or already started/completed.")
 
-    existing_submission = db.query(models.ExamSubmission).filter(models.ExamSubmission.exam_id == exam_id, models.ExamSubmission.student_id == user_data["user_id"]).first()
+    existing_submission = db.query(ExamSubmission).filter(ExamSubmission.exam_id == exam_id, ExamSubmission.student_id == user_data["user_id"]).first()
     if existing_submission:
         raise HTTPException(status_code=400, detail="You have already submitted this exam.")
 
-    submission = models.ExamSubmission(exam_id=exam_id, student_id=user_data["user_id"], answers=answers)
+    submission = ExamSubmission(exam_id=exam_id, student_id=user_data["user_id"], answers=answers)
     db.add(submission)
     db.commit()
     db.refresh(submission)  
     
     return {
         "message": "Exam submitted successfully.",
-        "submission_id": submission.id  # You can switch positions of message and submission_id here
+        "submission_id": submission.id
     }
 
 @exam_router.put("/exam-submissions/{submission_id}/marks", response_model=schemas.ExamSubmissionResponse)
@@ -409,7 +408,7 @@ async def update_marks(submission_id: int, marks: float, exam_id: int, db: Sessi
     if user_data["role"] != "teacher":
         raise HTTPException(status_code=403, detail="Only teachers can update/give marks.")
     
-    exam = db.query(models.Exam).filter(models.Exam.id == exam_id).first()
+    exam = db.query(Exam).filter(Exam.id == exam_id).first()
     if not exam:
         raise HTTPException(status_code=404, detail="Exam not found.")
     
@@ -478,7 +477,7 @@ async def password_reset_request(data: schemas.PasswordResetRequest, db: Session
     reset_code = config.generate_verification_code()
     expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
-    reset_request = models.PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
+    reset_request = PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
     db.add(reset_request)
     db.commit()
 
@@ -487,8 +486,8 @@ async def password_reset_request(data: schemas.PasswordResetRequest, db: Session
 
 @pass_router.post("/password-reset/")
 async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depends(get_db)):
-    reset_request = db.query(models.PasswordResetRequest).join(models.User).filter(
-        models.User.email == data.email, models.PasswordResetRequest.reset_code == data.code
+    reset_request = db.query(PasswordResetRequest).join(User).filter(
+        User.email == data.email, PasswordResetRequest.reset_code == data.code
     ).first()
 
     if not reset_request:
@@ -497,7 +496,7 @@ async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depend
     if reset_request.expiry_time < datetime.utcnow():
         raise HTTPException(status_code=400, detail="Reset code has expired")
 
-    user = db.query(models.User).filter(models.User.email == data.email).first()
+    user = db.query(User).filter(User.email == data.email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -515,7 +514,7 @@ async def password_reset(data: schemas.PasswordResetVerify, db: Session = Depend
     return {"message": "Password reset successfully."}
 
 @pass_router.post("/password-change/")
-async def change_password(data: schemas.ChangePassword, current_user: models.User = Depends(security.get_current_user), db: Session = Depends(get_db)):
+async def change_password(data: schemas.ChangePassword, current_user: User = Depends(security.get_current_user), db: Session = Depends(get_db)):
 
     if not security.pwd_context.verify(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect old password")

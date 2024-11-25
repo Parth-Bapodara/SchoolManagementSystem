@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from src.api.v1.authentication import security
 from src.api.v1.schemas import schemas
-from src.api.v1.models import models
+from src.api.v1.user.models.user_models import User
+from models import models
 from Database import database
 from typing import List
 
@@ -11,7 +12,7 @@ router = APIRouter()
 
 # Clock-in endpoint
 @router.post("/clockin", response_model=schemas.AttendanceResponse)
-def clock_in_user(db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+def clock_in_user(db: Session = Depends(database.get_db), current_user: User = Depends(security.get_current_user)):
     # Check if max clock-ins reached
     today_date = datetime.utcnow().date()
     today_clockins = db.query(models.Attendance).filter(
@@ -34,7 +35,7 @@ def clock_in_user(db: Session = Depends(database.get_db), current_user: models.U
 
 # Clock-out endpoint
 @router.post("/clockout", response_model=schemas.AttendanceResponse)
-def clock_out_user(db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+def clock_out_user(db: Session = Depends(database.get_db), current_user: User = Depends(security.get_current_user)):
     # Get the latest open clock-in record
     attendance = db.query(models.Attendance).filter(
         models.Attendance.user_id == current_user.id,
@@ -57,7 +58,7 @@ def clock_out_user(db: Session = Depends(database.get_db), current_user: models.
 
 # Endpoint to get total work hours and distinct days worked in the last week
 @router.get("/weekly-report", response_model=schemas.WeeklyReportResponse)
-def get_weekly_report(db: Session = Depends(database.get_db), current_user: models.User = Depends(security.get_current_user)):
+def get_weekly_report(db: Session = Depends(database.get_db), current_user: User = Depends(security.get_current_user)):
     one_week_ago = datetime.utcnow() - timedelta(days=7)
     
     attendances = db.query(models.Attendance).filter(

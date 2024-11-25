@@ -2,7 +2,6 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
 from pydantic import BaseModel, EmailStr
 import random,os,smtplib
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Any
