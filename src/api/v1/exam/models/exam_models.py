@@ -1,8 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
-from database.base import Base
+from Database.database import Base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
-from src.api.v1.user.models.user_models import User
+#from src.api.v1.user.models.user_models import User
 
 #DB model representing a class with fields like id and name.
 class Class(Base):
