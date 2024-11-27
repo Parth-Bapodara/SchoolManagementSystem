@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from src.api.v1.authentication.google_auth import oauth
-from src.api.v1.authentication.security import JWTBearer, create_access_token, decode_access_token, token_response
+from src.api.v1.user.utils.google_auth import oauth
+from src.api.v1.security.security import JWTBearer, create_access_token, decode_access_token, token_response
 from datetime import timedelta
 from starlette.middleware.sessions import SessionMiddleware
 from Config import config

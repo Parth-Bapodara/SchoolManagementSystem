@@ -3,24 +3,6 @@ from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta,timezone
 
-class ClassCreate(BaseModel):
-    name:str
-    
-    @validator('name')
-    def password_complexity(cls,value):
-        if len(value) < 2:
-            raise ValueError("Class name atleast contain 2 or more Characters.")
-        return value
-
-#For creating new diffrent Subjects
-class SubjectCreate(BaseModel):
-    name:str
-
-    @validator('name')
-    def password_complexity(cls,value):
-        if len(value) < 3:
-            raise ValueError("Subject name atleast contain 3 or more Characters and no Abbreviations.")
-        return value
 
 #For creating new diffrent Exams
 class ExamCreate(BaseModel):
@@ -60,7 +42,7 @@ class ExamUpdate(BaseModel):
     class_id: Optional[int] = None
     date: Optional[datetime] = None
     duration: Optional[int] = None
-    status: Optional[str] = None
+    #status: Optional[str] = None
     #marks: Optional[float] = None
 
     class Config:

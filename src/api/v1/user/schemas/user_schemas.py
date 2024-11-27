@@ -59,7 +59,9 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
     @validator('password')
-    def password_complexity(cls,value):
-        if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
-            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")
+    def password_complexity(cls, value):
+        if value and not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', value):
+            raise ValueError("Password must contain an uppercase, lowercase, at least one digit, and at least one special character.")
+        if value and len(value) < 8:
+            raise ValueError("Password should be a minimum of 8 characters.")
         return value

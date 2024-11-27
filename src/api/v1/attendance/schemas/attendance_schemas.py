@@ -1,12 +1,12 @@
-from pydantic import BaseModel, Field, validator, EmailStr, model_validator
+from pydantic import BaseModel
 from typing import Literal,Optional
-import re
 from datetime import datetime,timedelta,timezone
 
+#to record clock-in time of user
 class AttendanceIn(BaseModel):
     clock_in: datetime
 
-#to clock out user
+#to record clock-out time of user
 class AttendanceOut(BaseModel):
     clock_out: datetime
 

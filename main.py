@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from routers.routers import router
 from starlette.middleware.sessions import SessionMiddleware

@@ -23,6 +23,12 @@ class PasswordResetVerify(BaseModel):
         if not any(char.isupper() for char in password):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
+    
+    @validator("confirm_password")
+    def check_password_match(cls, confirm_password, values):
+        if "new_password" in values and confirm_password != values["new_password"]:
+            raise ValueError("The passwords do not match.")
+        return confirm_password
 
 #to change user password
 class ChangePassword(BaseModel):
@@ -41,6 +47,12 @@ class ChangePassword(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
 
+    @validator("confirm_password")
+    def check_password_match(cls, confirm_password, values):
+        if "new_password" in values and confirm_password != values["new_password"]:
+            raise ValueError("The passwords do not match.")
+        return confirm_password
+    
 #to pass simple message
 class Message(BaseModel):
     message:str

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from src.api.v1.user.models.user_models import User
-from src.api.v1.authentication import security
+from src.api.v1.security import security
 from Database.database import get_db
 from sqlalchemy.exc import SQLAlchemyError 
 

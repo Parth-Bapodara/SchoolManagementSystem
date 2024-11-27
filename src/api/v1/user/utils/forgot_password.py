@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Request, APIRouter
 from sqlalchemy.orm import Session
-from src.api.v1.authentication import security
+from src.api.v1.security import security
 from src.api.v1.user.models.user_models import User
 from Database.database import get_db, Base, engine
 from datetime import timedelta, datetime, timezone
