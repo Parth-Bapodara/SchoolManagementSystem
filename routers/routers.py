@@ -7,7 +7,7 @@ from src.api.v1.exam.views.exam_view import router as Exam_Management
 from src.api.v1.exam.views.marks_view import router as Marks_management
 
 from src.api.v1.user.views.user_nomral_login import router as User_Login
-from src.api.v1.user.utils.forgot_password import router as forgot_password
+from src.api.v1.user.views.forgot_password import router as Forgot_Password
 from src.api.v1.attendance.view.views import router as attendance_services
 
 router = APIRouter()
@@ -20,6 +20,6 @@ router.include_router(Exam_Management, tags=["Exam Management"])
 router.include_router(Marks_management, tags=["Marks Management"])
 
 router.include_router(User_Login, tags=["User Login"])
-router.include_router(forgot_password, tags=["Forgot Password"])
+router.include_router(Forgot_Password, tags=["Forgot Password"])
 router.include_router(attendance_services, tags=["Attendance Management"])
 

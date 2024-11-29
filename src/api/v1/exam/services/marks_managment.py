@@ -1,22 +1,15 @@
 from sqlalchemy.orm import Session
-from src.api.v1.exam.models.exam_models import ExamSubmission,Exam
+from src.api.v1.exam.models.exam_models import ExamSubmission, Exam
 from src.api.v1.exam.schemas.exam_schemas import ExamSubmissionCreate, ExamSubmissionResponse
-from src.api.v1.security import security
-from jose import jwt, JWTError
 from src.api.v1.utils.response_utils import Response
 
 class ExamSubmissionServices:
 
     @staticmethod
-    def take_exam(db: Session, exam_id: int, answers: str, token: str):
+    def take_exam(db: Session, exam_id: int, answers: str, user_data: dict):
         """
         Submit an exam for a student
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.", data={}).send_error_response()
-
         if user_data["role"] != "student":
             return Response(status_code=403, message="Only students can take exams.", data={}).send_error_response()
 
@@ -40,15 +33,10 @@ class ExamSubmissionServices:
         ).send_success_response()
 
     @staticmethod
-    def update_marks(db: Session, submission_id: int, marks: float, exam_id: int, token: str):
+    def update_marks(db: Session, submission_id: int, marks: float, exam_id: int, user_data: dict):
         """
         Update marks for a student's exam submission
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.", data={}).send_error_response()
-
         if user_data["role"] != "teacher":
             return Response(status_code=403, message="Only teachers can update marks.", data={}).send_error_response()
 

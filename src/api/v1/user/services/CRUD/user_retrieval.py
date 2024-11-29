@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session
 from src.api.v1.user.models.user_models import User
 from src.api.v1.security import security
 from src.api.v1.utils.response_utils import Response
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException,Depends
 from src.api.v1.security.security import JWTBearer
-from jose import jwt,JWTError
+from jose import JWTError
 
 DEFAULT_PAGE = 1
 DEFAULT_LIMIT = 5
@@ -22,16 +22,17 @@ class UserService:
         """Fetch users by role (admin, student, or teacher)."""
         try:
             # Decode the token and extract user data
-            user_data = security.decode_jwt(token)
+            user_data = security.decode_access_token(token)
         except JWTError:
-            raise HTTPException(status_code=403, detail="Invalid token")
+            return Response(status_code=403, message="Invalid token", data={}).send_error_response
 
         # Check if the user is an admin
         if user_data.get("role") != "admin":
-            raise HTTPException(
+            return Response(
                 status_code=403,
-                detail=f"Not authorized to view {role}s. Only admins can access this data."
-            )
+                message=f"Not authorized to view {role}s. Only admins can access this data.",
+                data={}
+            ).send_error_response()
 
         # Calculate pagination
         skip, limit = UserService.get_skip_and_limit(page, limit)
@@ -53,5 +54,9 @@ async def get_current_user(token: str = Depends(JWTBearer())):
     This helper function decodes the JWT token, extracts user data,
     and returns the current user.
     """
-    user_data = security.decode_jwt(token)  # Decode token and extract user data
+    try:
+        user_data = security.decode_jwt(token)  # Decode token and extract user data
+    except JWTError:
+        return Response(status_code=403, message="Invalid token", data={}).send_error_response()
+
     return user_data  # You can now use this user data throughout your routes

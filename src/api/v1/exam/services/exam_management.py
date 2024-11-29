@@ -6,19 +6,18 @@ from src.api.v1.security import security
 from jose import jwt, JWTError
 from datetime import datetime, timezone, timedelta
 from src.api.v1.utils.response_utils import Response
+import logging
+from fastapi import UploadFile, File
+
+logger = logging.getLogger(__name__)
 
 class ExamManagementServices:
 
     @staticmethod
-    def create_exam(db: Session, exam_data: ExamCreate, token: str):
+    def create_exam(db: Session, exam_data: ExamCreate, user_data: dict, exam_pdf: UploadFile = File(None)):
         """
-        Create a new exam
+        Create a new exam with optional exam PDF upload.
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.", data={}).send_error_response()
-
         if user_data["role"] != "teacher":
             return Response(status_code=403, message="Only teachers can create exams.", data={}).send_error_response()
         
@@ -37,13 +36,23 @@ class ExamManagementServices:
         if not class_:
             return Response(status_code=404, message="Class not found.", data={}).send_error_response()
 
+        # Save the exam PDF if provided
+        exam_pdf_path = None
+        if exam_pdf:
+            # Save the file to the server (ensure this directory exists)
+            exam_pdf_path = f"uploaded_files/exams/{exam_pdf.filename}"
+            with open(exam_pdf_path, "wb") as f:
+                f.write(exam_pdf.file.read())
+
         new_exam = Exam(
             subject_id=exam_data.subject_id,
             class_id=exam_data.class_id,
             date=exam_data.date,
             duration=exam_data.duration,
-            created_by=user_data.get("user_id")
+            created_by=user_data.get("user_id"),
+            exam_pdf=exam_pdf_path  # Save the file path in the database
         )
+
         db.add(new_exam)
         db.commit()
         db.refresh(new_exam)
@@ -51,23 +60,21 @@ class ExamManagementServices:
         return Response(
             status_code=201, 
             message="Exam created successfully.", 
-            data={"exam_id": new_exam.id, "date": new_exam.date.isoformat()}
+            data={"exam_id": new_exam.id, "date": new_exam.date.isoformat(), "exam_pdf": exam_pdf_path}
         ).send_success_response()
 
     @staticmethod
-    def get_all_exams(db: Session, token: str):
+    def get_all_exams(db: Session, user_data: dict, page: int, limit: int):
         """
-        Get all exams for students
+        Get all exams with pagination
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.", data={}).send_error_response()
-
         if user_data["role"] != "student":
             return Response(status_code=403, message="Only students can view exams.", data={}).send_error_response()
+        
+        total_exams = db.query(Exam).count()
+        skip = (page - 1) * limit
 
-        exams = db.query(Exam).join(Subject).join(Class).all()
+        exams = db.query(Exam).join(Subject).join(Class).offset(skip).limit(limit).all()
         current_time = datetime.now(timezone.utc)
 
         for exam in exams:
@@ -93,22 +100,25 @@ class ExamManagementServices:
             }
             for exam in exams
         ]
+        total_pages = (total_exams + limit - 1) // limit
+
         return Response(
             status_code=200,
             message="Exams retrieved successfully.",
-            data=exams_with_names
+            data={
+                "exams": exams_with_names,
+                "total_exams": total_exams,
+                "total_pages": total_pages,
+                "page": page,
+                "limit": limit
+            }
         ).send_success_response()
 
     @staticmethod
-    def update_exam(db: Session, exam_id: int, exam_update: ExamUpdate, token: str):
+    def update_exam(db: Session, exam_id: int, exam_update: ExamUpdate, user_data: dict):
         """
         Update exam information
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.", data={}).send_error_response()
-
         user_id = user_data.get("user_id")
         if user_data["role"] != "teacher":
             return Response(status_code=403, message="Only teachers can update exam information.", data={}).send_error_response()
@@ -165,15 +175,10 @@ class ExamManagementServices:
         ).send_success_response()
 
     @staticmethod
-    def delete_exam(db: Session, exam_id: int, token: str):
+    def delete_exam(db: Session, exam_id: int, user_data: dict):
         """
         Delete an exam by its ID (only if not started or finished)
         """
-        try:
-            user_data = jwt.decode(token, security.SECRET_KEY, algorithms=[security.ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Invalid token. Could not validate credentials.").send_error_response()
-
         user_id = user_data.get("user_id")
         if user_data["role"] not in ["admin", "teacher"]:
             return Response(status_code=403, message="Only admins or teachers can delete exams.", data={}).send_error_response()
@@ -184,8 +189,6 @@ class ExamManagementServices:
 
         if user_data["role"] == "teacher" and exam.created_by != user_id:
             return Response(status_code=403, message="You can only delete exams you created.", data={}).send_error_response()
-
-        # Check if the exam is not already started or finished
         current_time = datetime.now(timezone.utc)
 
         if exam.date.tzinfo is None:

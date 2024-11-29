@@ -10,36 +10,44 @@ router = APIRouter()
 # Helper function to extract and verify user data from token
 async def get_current_user(token: str = Depends(security.JWTBearer()), db: Session = Depends(get_db)):
     """
-    This helper function decodes the JWT token, extracts user data,
-    and returns the current user.
+    This helper function uses the decode_access_token to decode the token and extract user data.
+    It will return the user data that can be used throughout your routes.
     """
-    user_data = security.decode_jwt(token)  # Decode token and extract user data
+    user_data = security.decode_access_token(token)  # Decode the token using the decode_access_token method
     return user_data  # You can now use this user data throughout your routes
 
 @router.post("/user/create/")
-async def create_user(user: UserCreate, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+async def create_user(
+    user: UserCreate, 
+    db: Session = Depends(get_db), 
+    user_data: dict = Depends(security.JWTBearer())
+):
     """
-    Create a new user
+    Create a new user.
+    Only an admin can create a new user.
     """
-    return UserServices.create_user(db=db, user_data=user, current_user=user_data)
-
-@router.put("/user/update-info/", response_model=UserInDb)
-async def update_user_info(user_update: UserUpdate, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
-    """
-    Update user information like password
-    """
-    return UserServices.update_user_info(db=db, user_update=user_update, current_user=user_data)
+    # Pass the raw JWT token to the service method
+    return UserServices.create_user(db=db, user_data=user, token=user_data)
 
 @router.get("/user/me", response_model=UserInDb)
-async def read_user_info(db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+async def read_user_info(
+    db: Session = Depends(get_db), 
+    user_data: dict = Depends(security.JWTBearer())
+):
     """
     Get the current user's info based on the token
     """
-    return UserServices.get_user_info(db=db, current_user=user_data)
+    return UserServices.get_user_info(db=db, token=user_data)
 
 @router.delete("/user/{user_id}/")
-async def delete_user(user_id: int, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+async def delete_user(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    user_data: dict = Depends(security.JWTBearer())  # This will decode the token
+):
     """
     Delete a user by ID
+    Only admins can delete users.
     """
-    return UserServices.delete_user(db=db, user_id=user_id, current_user=user_data)
+    # Call the service to delete the user
+    return UserServices.delete_user(db=db, user_id=user_id, user_data=user_data)

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from src.api.v1.utils.response_utils import Response
 from src.api.v1.user.services.Login.normal_login import LoginServices
 from Database.database import get_db
-
+from src.api.v1.security.security import JWTBearer
 
 router = APIRouter()
 
@@ -30,11 +30,11 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     """
     return await LoginServices.google_callback(request, db)
 
-# @router.get("/protected-endpoint")
-# async def protected_endpoint(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
-#     """
-#     A secured endpoint that verifies the JWT token and checks if the user exists.
-#     If the user doesn't exist, they are created as a new user.
-#     """
-#     response = LoginServices.verify_token_and_get_user(db, token)
-#     return response
+@router.get("/protected-endpoint")
+async def protected_endpoint(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    """
+    A secured endpoint that verifies the JWT token and checks if the user exists.
+    If the user doesn't exist, they are created as a new user.
+    """
+    response = LoginServices.verify_token_and_get_user(db, token)
+    return response

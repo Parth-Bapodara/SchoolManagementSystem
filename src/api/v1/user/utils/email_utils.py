@@ -4,6 +4,7 @@ import random,os,smtplib
 from Config.config import settings
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import logging
 
 class EmailSettings(BaseModel):
     MAIL_USERNAME: str = "parth.bapodara@mindinventory.com"
@@ -60,8 +61,10 @@ async def send_verification_email(recipient_email: str, reset_code: str) -> None
             text = msg.as_string()
             server.sendmail(email_settings.MAIL_FROM, recipient_email, text)
 
+        logging.info(f"Verification email sent to {recipient_email}")
+
     except Exception as e:
-        print(f"Error sending email: {str(e)}")
+        logging.error(f"Error sending email: {str(e)}")
         raise Exception("Failed to send verification email.")
 
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID

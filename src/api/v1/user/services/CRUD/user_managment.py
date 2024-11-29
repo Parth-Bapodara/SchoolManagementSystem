@@ -1,11 +1,10 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from src.api.v1.user.models.user_models import User
-from src.api.v1.security.security import SECRET_KEY,ALGORITHM, get_password_hash
+from src.api.v1.security.security import SECRET_KEY, ALGORITHM, get_password_hash, decode_access_token  # Import the decode_access_token function
 from fastapi import HTTPException, status
 from src.api.v1.utils.response_utils import Response
 from src.api.v1.user.schemas.user_schemas import UserCreate, UserUpdate, UserInDb
-from jose import jwt, JWTError
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -18,17 +17,16 @@ class UserServices:
     @staticmethod
     def create_user(db: Session, user_data: UserCreate, token: str):
         try:
-            # Log the token for debugging purposes
             logger.info(f"Received token: {token}")
             
-            # Decode the token
-            user_data_decoded = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            # Decode the token using decode_access_token
+            user_data_decoded = decode_access_token(token)  # Decode the raw JWT token here
             logging.info(f"Decoded token: {user_data_decoded}")
-        except JWTError:
-            logging.error("Invalid token")
+        except Exception as e:
+            logging.error(f"Error decoding token: {str(e)}")
             return Response(status_code=403, message="Token is invalid or expired.", data={}).send_error_response()
 
-    # Check if the role is "admin"
+        # Check if the role is "admin"
         if user_data_decoded.get("role") != "admin":
             logging.warning("Unauthorized access attempt")
             return Response(
@@ -60,90 +58,32 @@ class UserServices:
 
         return {"msg": f"{user_data.role.capitalize()} created successfully", "email": db_user.email, "id": db_user.id, "role": db_user.role}
 
-
-    @staticmethod
-    def update_user_info(db: Session, user_update: UserUpdate, token: str):
-        try:
-            user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Could not validate credentials", data={}).send_error_response()
-
-        user_id = int(user_data.get("user_id"))
-        current_user = db.query(User).filter(User.id == user_id).first()
-        if not current_user:
-            return Response(status_code=404, message="User not found.", data={}).send_error_response()
-
-        if user_update.password:
-            current_user.hashed_password = get_password_hash(user_update.password)
-
-        db.commit()
-        db.refresh(current_user)
-
-        return current_user
-
-    @staticmethod
-    def get_users_by_role(db: Session, token: str, role: str, page: int, limit: int):
-        try:
-            user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Could not validate credentials", data={}).send_error_response()
-
-        if user_data["role"] != "admin":
-            return Response(
-                status_code=403,
-                message="Not authorized to view users.",
-                data={}
-            ).send_error_response()
-        
-        skip = (page - 1) * limit
-
-        users = db.query(User).filter(User.role == role).offset(skip).limit(limit).all()
-        total_users = db.query(User).filter(User.role == role).count()
-
-        if not users:
-            if skip >= total_users:
-                return Response(status_code=404, message="Page exceeds the number of available users.", data={}).send_error_response()
-            return Response(status_code=404, message=f"No {role}s found.", data={}).send_error_response()
-
-        total_pages = (total_users + limit - 1) // limit
-
-        return {
-            "page": page,
-            "limit": limit,
-            "total_users": total_users,
-            "total_pages": total_pages,
-            "users": users
-        }
-
     @staticmethod
     def get_user_info(db: Session, token: str):
         try:
-            user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Could not validate credentials", data={}).send_error_response()
+            user_data = decode_access_token(token)
+            user_id = user_data["sub"]  # Assuming 'sub' holds the user_id
+        except Exception as e:
+            return Response(status_code=403, message="Invalid or expired token", data={}).send_error_response()
 
-        user_id = int(user_data.get("user_id"))
         user = db.query(User).filter(User.id == user_id).first()
-        
-        if not user:
-            return Response(status_code=404, message="User not found.", data={})
-        return user
-    
-    @staticmethod
-    def delete_user(db: Session, user_id: int, token: str):
-        try:
-            user_data = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        except JWTError:
-            return Response(status_code=403, message="Could not validate credentials", data={}).send_error_response()
+        if user:
+            return user
+        return Response(status_code=404, message="User not found", data={}).send_error_response()
 
-        if user_data["role"] != "admin":
-            return Response(status_code=status.HTTP_403_FORBIDDEN, message="Only admins can delete users.", data={}).send_error_response()
+    @staticmethod
+    def delete_user(db: Session, user_id: int, user_data: dict):
+        try:
+            if user_data.get("role") != "admin":
+                return Response(status_code=403, message="Admin privileges required", data={}).send_error_response()
+        except Exception as e:
+            return Response(status_code=403, message="Invalid or expired token", data={}).send_error_response()
 
         user_to_delete = db.query(User).filter(User.id == user_id).first()
-        if not user_to_delete:
-            return Response(status_code=status.HTTP_404_NOT_FOUND, message="User not found.", data={}).send_error_response()
+        if user_to_delete:
+            db.delete(user_to_delete)
+            db.commit()
+            return {"message": "User deleted successfully."}
+        
+        return Response(status_code=404, message="User not found", data={}).send_error_response()
 
-        db.delete(user_to_delete)
-        db.commit()
-
-        return{"msg": "User deleted successfully"}

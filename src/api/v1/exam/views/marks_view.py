@@ -7,14 +7,13 @@ from src.api.v1.security import security
 
 router = APIRouter()
 
-# Helper function to extract and verify user data from the token
 async def get_current_user(token: str = Depends(security.JWTBearer()), db: Session = Depends(get_db)):
     """
-    This helper function decodes the JWT token, extracts user data,
+    This helper function decodes the JWT token using decode_access_token to extract user data,
     and returns the current user.
     """
-    user_data = security.decode_jwt(token)  # Decode token and extract user data
-    return user_data  # You can now use this user data throughout your routes
+    user_data = security.decode_access_token(token)  # Decode token using the correct method
+    return user_data  # Return the decoded user data to be used in the route handlers
 
 @router.post("/exams/{exam_id}/submit/")
 async def submit_exam(
