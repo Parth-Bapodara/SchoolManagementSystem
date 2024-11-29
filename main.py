@@ -4,7 +4,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from Config.config import settings
 from src.api.v1.seed_admin import seed_data
 
-app = FastAPI(title="School Management System", version="1.0")
+app = FastAPI(title="School Management System", version="1.0",)
 app.add_middleware(SessionMiddleware, secret_key=settings.GOOGLE_CLIENT_SECRET)
 
 app.include_router(router)

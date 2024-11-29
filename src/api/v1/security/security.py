@@ -1,152 +1,147 @@
 from datetime import datetime, timedelta
-from typing import Dict
-from jose import JWTError, jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, status, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
-from src.api.v1.user.models.user_models import User
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
 from Database.database import get_db
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.requests import Request
-from decouple import config
-import logging,time
+from src.api.v1.user.models.user_models import User
 
+# Secret key for encoding/decoding JWT tokens, store it securely
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
-
+# Password hashing context for bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-logging.basicConfig(level=logging.INFO)
+# JWT Bearer Authentication
+class JWTBearer(HTTPBearer):
+    def __init__(self, auto_error: bool = True):
+        super(JWTBearer, self).__init__(auto_error=auto_error)
 
+    async def __call__(self, request: Request):
+        credentials: HTTPAuthorizationCredentials = await super(JWTBearer, self).__call__(request)
+        
+        if not credentials or credentials.scheme != "Bearer":
+            raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
+        
+        # Log the received token for debugging
+        print(f"Received Token: {credentials.credentials}")
+
+        # Verify the JWT token
+        if not self.verify_jwt(credentials.credentials):
+            raise HTTPException(status_code=403, detail="Invalid or expired token.")
+        
+        return credentials.credentials
+    
+    def verify_jwt(self, jwtoken: str) -> bool:
+        try:
+            # Decode and validate the token
+            decode_access_token(jwtoken)
+            return True
+        except HTTPException:
+            return False
+
+# Function to create JWT access token
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+
+    # Ensure 'user_id' is included (this is now the subject)
+    if "user_id" not in to_encode:
+        raise HTTPException(status_code=400, detail="User ID is required in the data")
+
+    expire = datetime.utcnow() + expires_delta if expires_delta else datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"sub": str(data["user_id"]), "exp": expire})
+
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# Decoding the token and extracting the necessary details
+def decode_access_token(token: str):
+    try:
+        # Decode the JWT token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Extract user_id from the 'sub' field in the payload (ensure it's an integer)
+        if "sub" not in payload:
+            raise HTTPException(status_code=401, detail="Token does not have the required user information.")
+        
+        user_id = int(payload["sub"])  # Ensure user_id is treated as an integer
+        print(f"Decoded Token User ID: {user_id}")  # Debugging: Print the user_id
+
+        # Verify if the token is expired
+        expiration_time = datetime.utcfromtimestamp(payload["exp"])
+        if expiration_time < datetime.utcnow():
+            raise HTTPException(status_code=401, detail="Token has expired")
+
+        return payload  # Return the decoded payload
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+# Password hashing and verification functions
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + expires_delta if expires_delta else datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"user_id": data.get("user_id"), "exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+# Role-based authorization for admin access
+def authorize_admin(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    payload = decode_access_token(token)
+    if payload.get("role") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin authorization required")
+    return payload
 
-def decode_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        if "exp" in payload and datetime.utcfromtimestamp(payload["exp"]) < datetime.utcnow():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return payload
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+# Role-based authorization for user access (admin, teacher, student)
+def authorize_user(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    """
+    Function to authorize the user by validating the JWT token.
+    The `sub` claim in the token should contain the username or user ID.
+    """
+    # Decode the access token to get user data
+    payload = decode_access_token(token)
     
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    username = payload.get("sub")  # 'sub' should contain the username (or user ID)
     
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("user_id")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
+    # If the 'sub' field is not set or is invalid, raise an error
+    if not username:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token does not have the required user information.")
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
-        raise credentials_exception
+    # Fetch user details from the database using the username (or user_id)
+    user = db.query(User).filter(User.username == username).first()  # You can use 'user_id' instead of 'username' if preferred
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    
+    # Ensure the role is valid by checking the user's role from the database
+    if user.role not in ["admin", "teacher", "student"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid role")
     
     return user
 
-def decode_access_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": True})
-        
-        logging.info(f"Decoded payload: {payload}")  
-    
-        if "exp" in payload and datetime.utcfromtimestamp(payload["exp"]) < datetime.utcnow():
-            logging.warning("Token has expired.")
-            raise HTTPException(status_code=401, detail="Token is expired.")
-        
-        return payload
-    except JWTError as e:
-        logging.error(f"JWT Error: {str(e)}") 
-        raise HTTPException(status_code=401, detail="Token is invalid or has expired")
-
+# Response format for token responses
 def token_response(token: str):
     return {
-        "access_token": token
+        "access_token": token,
+        "token_type": "bearer"
     }
 
-def decode_jwt(token: str) -> dict:
-    try:
-        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        
-        if decoded_token.get("exp") >= time.time():
-            return decoded_token
-        else:
-            logging.warning("Token has expired.")
-            return {}
-    except JWTError as e:
-        logging.error(f"Error decoding token: {str(e)}")
-        return {}
-
-class JWTBearer(HTTPBearer):
-    def __init__(self, auto_error: bool = True):
-        super().__init__(auto_error=auto_error)
-
-    async def __call__(self, request: Request):
-        credentials: HTTPAuthorizationCredentials = await super().__call__(request)
-        
-        if not credentials or credentials.scheme != "Bearer":
-            raise HTTPException(status_code=403, detail="Invalid authentication scheme.")
-        
-        logging.info(f"Received token: {credentials.credentials}") 
-        self.verify_jwt(credentials.credentials)  
-        return credentials.credentials
-
-    def verify_jwt(self, jwtoken: str):
-        decode_access_token(jwtoken)
-
-def get_current_user_2(token: str = Depends(JWTBearer())):
-    try:
-        payload = decode_access_token(token)
-        user_email = payload.get("sub")
-        
-        if user_email is None:
-            logging.warning("Token is missing 'sub' claim.")
-            raise HTTPException(status_code=401, detail="Invalid token")
-        
-        logging.info(f"Authenticated user: {user_email}")
-        return user_email
-    except HTTPException as e:
-        raise e
-    except KeyError:
-        logging.error("Token is missing required claims.")
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-    except Exception as e:
-        logging.error(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
-
-
-#  try:
-#         payload = decode_access_token(token)
-#         user_id: int = payload.get("user_id")
-#         if user_id is None:
-#             raise credentials_exception
-#     except JWTError:
-#         raise credentials_exception
+def get_current_user(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    """
+    This function will decode the JWT token and fetch the user from the database
+    based on the decoded token (using the 'sub' claim).
+    """
+    payload = decode_access_token(token)
+    
+    # Extract the 'sub' claim (which should be the username)
+    username = payload.get("sub")
+    if not username:
+        raise HTTPException(status_code=401, detail="Token does not have the required user information.")
+    
+    # Fetch the user from the database using the username
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    return user
