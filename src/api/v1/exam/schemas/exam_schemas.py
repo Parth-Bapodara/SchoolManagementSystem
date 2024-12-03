@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field, validator, EmailStr, model_validator
 from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta,timezone
-
+from fastapi import UploadFile
 
 #For creating new diffrent Exams
 class ExamCreate(BaseModel):
@@ -10,6 +10,9 @@ class ExamCreate(BaseModel):
     class_id: int
     date: datetime
     duration: int
+
+    class Config:
+        orm_mode = True
 
 #To check if the exam is present in DB or not
 class ExamInDb(BaseModel):

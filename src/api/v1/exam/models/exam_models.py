@@ -14,8 +14,7 @@ class Exam(Base):
     duration = Column(Integer, nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String, default="scheduled")
-    exam_pdf = Column(String, nullable=True)  # Add this field to store the file path
-
+    exam_pdf = Column(String, nullable=True)
 
     submissions = relationship("ExamSubmission", back_populates="exam")
     subject = relationship("Subject", back_populates="exams")
