@@ -10,8 +10,6 @@ app.add_middleware(SessionMiddleware, secret_key=settings.GOOGLE_CLIENT_SECRET)
 
 app.include_router(router)
 
-app.mount("/exam_papers", StaticFiles(directory="/home/python/Desktop/Parth/School-Management-System/uploads/exam_papers"), name="exam_papers")
-
 @app.on_event("startup")
 async def startup_event():
     seed_data()

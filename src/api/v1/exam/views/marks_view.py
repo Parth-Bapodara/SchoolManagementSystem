@@ -5,8 +5,8 @@ from src.api.v1.exam.services.marks_managment import ExamSubmissionServices
 from src.api.v1.exam.models.exam_models import Exam
 from Database.database import get_db
 from src.api.v1.security import security
-import os
-from fastapi.responses import FileResponse
+import os,logging
+from fastapi.responses import RedirectResponse
 from src.api.v1.utils.response_utils import Response
 
 router = APIRouter()
@@ -51,19 +51,18 @@ async def get_exam_pdf_link(
     db: Session = Depends(get_db),
 ):
     """
-    Endpoint for students to get a download link for the exam PDF if it's available.
+    Endpoint to redirect students to the download link for the exam PDF if it's available.
     """
     try:
         result = ExamSubmissionServices.get_exam_pdf_link(db, exam_id, user_data)
         
-        # If the result is a dictionary with the download URL, return it
         if isinstance(result, dict) and "download_url" in result:
             return Response(status_code=200, message="PDF download link fetched successfully.", data=result).send_success_response()
-        # Handle any errors returned by `get_exam_pdf_link`
         return result
-
+    
     except HTTPException as e:
         raise e
     except Exception as e:
-        # Catch unexpected errors and return a 500 response
-        return Response(status_code=500, message="An unexpected error occurred.", data=str(e)).send_error_response()
+        logging.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing the request.")
+

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     AWS_S3_BUCKET_NAME: str
     AWS_REGION: str
 
+    FACEBOOK_CLIENT_ID: int
+    FACEBOOK_CLIENT_SECRET: str
+    FACEBOOK_API_VERSION: str
+
     class Config():
         env_file = ".env"
     

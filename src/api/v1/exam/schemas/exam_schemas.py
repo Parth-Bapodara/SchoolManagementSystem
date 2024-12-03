@@ -6,10 +6,10 @@ from fastapi import UploadFile
 
 #For creating new diffrent Exams
 class ExamCreate(BaseModel):
-    subject_id: int
-    class_id: int
-    date: datetime
-    duration: int
+    subject_id: int = Field(..., example=1) 
+    class_id: int = Field(..., example=1)    
+    date: datetime = Field(..., example="2024-12-03T10:00:00Z")
+    duration: int = Field(..., example=60) 
 
     class Config:
         orm_mode = True

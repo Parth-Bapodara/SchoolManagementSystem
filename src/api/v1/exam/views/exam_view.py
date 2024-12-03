@@ -6,6 +6,7 @@ from src.api.v1.exam.services.exam_management import ExamManagementServices
 from Database.database import get_db
 from src.api.v1.security.security import decode_access_token,JWTBearer,authorize_user
 import logging,json,datetime, dateutil.parser
+from typing import Dict
 
 router = APIRouter()
 
@@ -21,38 +22,40 @@ async def get_current_user(token: str = Depends(JWTBearer()), db: Session = Depe
 
 @router.post("/create-exam/")
 async def create_exam(
-    exam_data: str = Form(...),  
-    user_data: dict = Depends(get_current_user), 
-    exam_pdf: UploadFile = File(None),  
-    db: Session = Depends(get_db)  
+    subject_id: int = Form(...),  # Individual fields for form data
+    class_id: int = Form(...),
+    date: str = Form(...),  # Receive date as a string
+    duration: int = Form(...),
+    user_data: Dict = Depends(get_current_user),  # Extract user from JWT
+    exam_pdf: UploadFile = File(None),  # Optional file upload
+    db: Session = Depends(get_db)  # Database session
 ):
     try:
+        # Parse date to datetime object
         try:
-            exam_dict = json.loads(exam_data)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON format in exam data.")
-        
-        try:
-            exam_date = dateutil.parser.parse(exam_dict['date'])
+            exam_date = dateutil.parser.parse(date)  # Convert string date to datetime object
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use ISO 8601 format.")
         
         if exam_date.tzinfo is None:
             exam_date = exam_date.replace(tzinfo=datetime.timezone.utc)
 
+        # Create ExamCreate model from form data
         exam_data_parsed = ExamCreate(
-            subject_id=exam_dict['subject_id'],
-            class_id=exam_dict['class_id'],
+            subject_id=subject_id,
+            class_id=class_id,
             date=exam_date,
-            duration=exam_dict['duration']
+            duration=duration
         )
 
+        # Example function to handle exam creation (your implementation of this part may vary)
         return await ExamManagementServices.create_exam(
             exam_data=exam_data_parsed,
             db=db,
             user_data=user_data,
             exam_pdf=exam_pdf
         )
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

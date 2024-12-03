@@ -7,6 +7,7 @@ from src.api.v1.security import security
 from src.api.v1.utils.response_utils import Response
 from sqlalchemy.exc import IntegrityError
 from src.api.v1.user.utils.google_auth import oauth
+from src.api.v1.user.utils.facebook_auth import oauth
 import logging
 
 class LoginServices:
@@ -36,9 +37,9 @@ class LoginServices:
         Initiates the Google OAuth2 login flow.
         This method will redirect the user to Google's OAuth2 page for authentication.
         """
-        redirect_uri = "http://127.0.0.1:8000/google/callback"  # URL where Google will send the response
+        redirect_uri = "http://127.0.0.1:8000/google/callback"  
         return await oauth.google.authorize_redirect(request, redirect_uri)
-
+    
     @staticmethod
     async def google_callback(request: Request, db: Session):
         """
@@ -47,10 +48,8 @@ class LoginServices:
         and retrieves user info from Google.
         """
         try:
-            # Exchange the authorization code for a token
             token = await oauth.google.authorize_access_token(request)
             
-            # Get the user information from Google API
             user_info = await oauth.google.get("https://www.googleapis.com/oauth2/v3/userinfo", token=token)
 
             if user_info.status_code != 200:
@@ -58,13 +57,11 @@ class LoginServices:
             
             user_data = user_info.json()
             user_email = user_data['email']
-            username = user_data.get('name', user_email)  # Use Google username or email if no name
+            username = user_data.get('name', user_email) 
 
-            # Check if the user exists in the database
             user = db.query(User).filter(User.email == user_email).first()
 
             if user:
-                # If user already exists, return success response with token
                 user_data = {"user_id": user.id, "role": user.role, "Mail": user.email, "Username": user.username, "Status": user.status}
                 access_token = security.create_access_token(data=user_data)
                 return Response(status_code=200, message="User already exists, proceeding", data={
@@ -73,23 +70,19 @@ class LoginServices:
                     "User_Data": user_data
                 }).send_success_response()
 
-            # If the user doesn't exist, create a new user with Google data
             new_user = User(
                 email=user_email,
-                username=username,  # Set Google username as the default
-                role="student",  # Set default role as 'student'
-                status="active",  # Default status is active
+                username=username,  
+                role="student", 
+                status="active",
             )
-
-            # Add user to the database and commit the transaction
             db.add(new_user)
             try:
-                db.commit()  # Commit the transaction
+                db.commit() 
             except IntegrityError:
-                db.rollback()  # If there’s an integrity error (e.g., duplicate username), rollback the transaction
+                db.rollback()
                 raise HTTPException(status_code=400, detail="Error creating user, possibly a duplicate.")
             
-            # Generate a JWT token for the new user
             user_data = {"user_id": new_user.id, "role": new_user.role, "Mail": new_user.email, "Username": new_user.username, "Status": new_user.status}
             access_token = security.create_access_token(data=user_data)
 
@@ -159,5 +152,62 @@ class LoginServices:
         except Exception as e:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+    @staticmethod
+    async def facebook_login(request: Request):
+        """
+        Initiates the Facebook OAuth2 login flow.
+        This method will redirect the user to GFacebook's OAuth2 page for authentication.
+        """
+        redirect_uri = "https://127.0.0.1:8000/facebook/callback"
+        return await oauth.facebook.authorize_redirect(request, redirect_uri)
+    
+    @staticmethod
+    async def facebook_callback(request: Request, db:Session):
+        try:
+            token = await oauth.facebook.authorize_access_token(request)
+            
+            user_info = await oauth.facebook.get("https://graph.facebook.com/me?fields=id,name,email,picture{url}", token=token)
 
+            if user_info.status_code != 200:
+                return Response(status_code=400, message="Failed to fetch user information from Facebook.", data={}).send_error_response()
+            
+            user_data = user_info.json()
+            user_email = user_data['email']
+            username = user_data.get('name', user_email) 
+
+            user = db.query(User).filter(User.email == user_email).first()
+
+            if user:
+                user_data = {"user_id": user.id, "role": user.role, "Mail": user.email, "Username": user.username, "Status": user.status}
+                access_token = security.create_access_token(data=user_data)
+                return Response(status_code=200, message="User already exists, proceeding", data={
+                    "access_token": access_token,
+                    "token_type": "bearer",
+                    "User_Data": user_data
+                }).send_success_response()
+
+            new_user = User(
+                email=user_email,
+                username=username,  
+                role="student", 
+                status="active",
+            )
+            db.add(new_user)
+            try:
+                db.commit() 
+            except IntegrityError:
+                db.rollback()
+                raise HTTPException(status_code=400, detail="Error creating user, possibly a duplicate.")
+            
+            user_data = {"user_id": new_user.id, "role": new_user.role, "Mail": new_user.email, "Username": new_user.username, "Status": new_user.status}
+            access_token = security.create_access_token(data=user_data)
+
+            return Response(status_code=200, message="Facebook Login successful, new user created", data={
+                "access_token": access_token,
+                "token_type": "bearer",
+                "User_Data": user_data
+            }).send_success_response()
+
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Error occurred during Facebook login: {str(e)}")
 
