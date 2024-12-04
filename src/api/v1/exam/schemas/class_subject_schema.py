@@ -1,9 +1,10 @@
-from pydantic import BaseModel, Field, validator, EmailStr, model_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
 
+#for creating new diffrent Classes
 class ClassCreate(BaseModel):
     name:str
     
-    @validator('name')
+    @field_validator('name')
     def password_complexity(cls,value):
         if len(value) < 2:
             raise ValueError("Class name atleast contain 2 or more Characters.")
@@ -13,7 +14,7 @@ class ClassCreate(BaseModel):
 class SubjectCreate(BaseModel):
     name:str
 
-    @validator('name')
+    @field_validator('name')
     def password_complexity(cls,value):
         if len(value) < 3:
             raise ValueError("Subject name atleast contain 3 or more Characters and no Abbreviations.")

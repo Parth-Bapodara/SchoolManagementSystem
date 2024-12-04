@@ -64,5 +64,5 @@ async def get_exam_pdf_link(
         raise e
     except Exception as e:
         logging.error(f"Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing the request.")
+        return Response(status_code=500, message="An error occurred while processing the request.", data={}).send_error_response()
 

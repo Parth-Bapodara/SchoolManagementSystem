@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from src.api.v1.security import security  # JWTBearer used here
+from src.api.v1.security import security  
 from src.api.v1.exam.models.class_subject_model import Class, Subject
 from src.api.v1.exam.schemas.class_subject_schema import ClassCreate, SubjectCreate
 from src.api.v1.exam.services.class_management import ClassSubjectServices

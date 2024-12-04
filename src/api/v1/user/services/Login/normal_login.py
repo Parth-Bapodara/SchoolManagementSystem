@@ -1,4 +1,5 @@
 from fastapi import HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from google.auth.transport.requests import Request
 import google.auth
@@ -7,8 +8,11 @@ from src.api.v1.security import security
 from src.api.v1.utils.response_utils import Response
 from sqlalchemy.exc import IntegrityError
 from src.api.v1.user.utils.google_auth import oauth
-from src.api.v1.user.utils.facebook_auth import oauth
-import logging
+from src.api.v1.user.utils.facebook_auth import oauth_1
+from dotenv import load_dotenv
+import logging,os
+
+load_dotenv()
 
 class LoginServices:
 
@@ -72,7 +76,8 @@ class LoginServices:
 
             new_user = User(
                 email=user_email,
-                username=username,  
+                username=username, 
+                hashed_password="Test@123", 
                 role="student", 
                 status="active",
             )
@@ -158,17 +163,18 @@ class LoginServices:
         Initiates the Facebook OAuth2 login flow.
         This method will redirect the user to GFacebook's OAuth2 page for authentication.
         """
-        redirect_uri = "https://127.0.0.1:8000/facebook/callback"
-        return await oauth.facebook.authorize_redirect(request, redirect_uri)
+        redirect_uri = "http://localhost:8000/facebook/callback"
+        return await oauth_1.facebook.authorize_redirect(request, redirect_uri)
     
     @staticmethod
     async def facebook_callback(request: Request, db:Session):
         try:
-            token = await oauth.facebook.authorize_access_token(request)
+            token = await oauth_1.facebook.authorize_access_token(request)
             
-            user_info = await oauth.facebook.get("https://graph.facebook.com/me?fields=id,name,email,picture{url}", token=token)
+            user_info = await oauth_1.facebook.get("https://graph.facebook.com/me?fields=id,name,email", token=token)
 
             if user_info.status_code != 200:
+                logging("data fetched successfully")
                 return Response(status_code=400, message="Failed to fetch user information from Facebook.", data={}).send_error_response()
             
             user_data = user_info.json()
@@ -188,7 +194,8 @@ class LoginServices:
 
             new_user = User(
                 email=user_email,
-                username=username,  
+                username=username, 
+                hashed_password="test@123",
                 role="student", 
                 status="active",
             )

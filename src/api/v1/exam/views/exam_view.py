@@ -3,6 +3,7 @@ from fastapi.exceptions import HTTPException
 from sqlalchemy.orm import Session
 from src.api.v1.exam.schemas.exam_schemas import ExamCreate, ExamUpdate
 from src.api.v1.exam.services.exam_management import ExamManagementServices
+from src.api.v1.utils.response_utils import Response
 from Database.database import get_db
 from src.api.v1.security.security import decode_access_token,JWTBearer,authorize_user
 import logging,json,datetime, dateutil.parser
@@ -22,25 +23,24 @@ async def get_current_user(token: str = Depends(JWTBearer()), db: Session = Depe
 
 @router.post("/create-exam/")
 async def create_exam(
-    subject_id: int = Form(...),  # Individual fields for form data
+    subject_id: int = Form(...),  
     class_id: int = Form(...),
-    date: str = Form(...),  # Receive date as a string
+    date: str = Form(...), 
     duration: int = Form(...),
-    user_data: Dict = Depends(get_current_user),  # Extract user from JWT
-    exam_pdf: UploadFile = File(None),  # Optional file upload
-    db: Session = Depends(get_db)  # Database session
+    user_data: Dict = Depends(get_current_user), 
+    exam_pdf: UploadFile = File(None),  
+    db: Session = Depends(get_db) 
 ):
     try:
-        # Parse date to datetime object
+       
         try:
-            exam_date = dateutil.parser.parse(date)  # Convert string date to datetime object
+            exam_date = dateutil.parser.parse(date) 
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use ISO 8601 format.")
         
         if exam_date.tzinfo is None:
             exam_date = exam_date.replace(tzinfo=datetime.timezone.utc)
 
-        # Create ExamCreate model from form data
         exam_data_parsed = ExamCreate(
             subject_id=subject_id,
             class_id=class_id,
@@ -48,7 +48,6 @@ async def create_exam(
             duration=duration
         )
 
-        # Example function to handle exam creation (your implementation of this part may vary)
         return await ExamManagementServices.create_exam(
             exam_data=exam_data_parsed,
             db=db,
@@ -57,19 +56,19 @@ async def create_exam(
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return Response(status_code=500, message=str(e), data={}).send_error_response()
 
-@router.get("/exams/")
-async def get_all_exams(
-    db: Session = Depends(get_db), 
-    user_data: dict = Depends(get_current_user),
-    page: int = 1,
-    limit: int = 10
-):
-    """
-    Get all exams with pagination
-    """
-    return ExamManagementServices.get_all_exams(db, user_data, page, limit)
+# @router.get("/exams/")
+# async def get_all_exams(
+#     db: Session = Depends(get_db), 
+#     user_data: dict = Depends(get_current_user),
+#     page: int = 1,
+#     limit: int = 10
+# ):
+#     """
+#     Get all exams with pagination
+#     """
+#     return ExamManagementServices.get_all_exams(db, user_data, page, limit)
 
 @router.put("/exams/{exam_id}")
 async def update_exam(

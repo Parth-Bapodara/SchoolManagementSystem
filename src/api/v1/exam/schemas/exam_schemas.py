@@ -1,8 +1,7 @@
-from pydantic import BaseModel, Field, validator, EmailStr, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta,timezone
-from fastapi import UploadFile
 
 #For creating new diffrent Exams
 class ExamCreate(BaseModel):
@@ -45,9 +44,7 @@ class ExamUpdate(BaseModel):
     class_id: Optional[int] = None
     date: Optional[datetime] = None
     duration: Optional[int] = None
-    #status: Optional[str] = None
-    #marks: Optional[float] = None
-
+    
     class Config:
         orm_mode = True
 

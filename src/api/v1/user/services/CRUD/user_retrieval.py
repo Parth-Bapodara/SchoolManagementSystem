@@ -21,12 +21,10 @@ class UserService:
     def get_users_by_role(db: Session, token: str, role: str, page: int, limit: int):
         """Fetch users by role (admin, student, or teacher)."""
         try:
-            # Decode the token and extract user data
             user_data = security.decode_access_token(token)
         except JWTError:
             return Response(status_code=403, message="Invalid token", data={}).send_error_response
 
-        # Check if the user is an admin
         if user_data.get("role") != "admin":
             return Response(
                 status_code=403,
@@ -34,19 +32,35 @@ class UserService:
                 data={}
             ).send_error_response()
 
-        # Calculate pagination
         skip, limit = UserService.get_skip_and_limit(page, limit)
+        total_users= db.query(User).count()
 
-        # Query the database for users based on role
         users = db.query(User).filter(User.role == role).offset(skip).limit(limit).all()
         if not users:
-            return {"msg": f"No {role}s found."}
+            if skip >= total_users:
+                return Response(
+                    status_code = 400,
+                    message="Page exceeds the number of available users.", 
+                    data={}
+                ).send_error_response()
+            return Response(
+                status_code=404, 
+                message=f"No {role}s found.", 
+                data={}
+            ).send_error_response()
+        
+        total_pages=(total_users + limit - 1) // limit
 
-        return {
+        return Response(
+            status_code=200,
+            message="Information Retrieved Successfully.",
+            data={
             "page": page,
             "limit": limit,
-            f"{role}s": [{"Email": user.email, "Role": user.role, "ID": user.id, "User_name": user.username, "Status": user.status} for user in users]
-        }
+            "total_users": total_users, 
+            "total_pages": total_pages, 
+            f"{role}s": [{"Email": user.email, "Role": user.role, "ID": user.id, "User_name": user.username, "Status": user.status} for user in users]}
+        ).send_success_response()
 
 # Helper function to extract user from the token
 async def get_current_user(token: str = Depends(JWTBearer())):
@@ -55,8 +69,8 @@ async def get_current_user(token: str = Depends(JWTBearer())):
     and returns the current user.
     """
     try:
-        user_data = security.decode_jwt(token)  # Decode token and extract user data
+        user_data = security.decode_jwt(token) 
     except JWTError:
         return Response(status_code=403, message="Invalid token", data={}).send_error_response()
 
-    return user_data  # You can now use this user data throughout your routes
+    return user_data  

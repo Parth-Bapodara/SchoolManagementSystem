@@ -77,7 +77,7 @@ class UserServices:
             if user_data.get("role") != "admin":
                 return Response(status_code=403, message="Admin privileges required", data={}).send_error_response()
         except Exception as e:
-            return Response(status_code=403, message="Invalid or expired token", data={}).send_error_response()
+            return Response(status_code=403, message="Invalid or expired token", data={e}).send_error_response()
 
         user_to_delete = db.query(User).filter(User.id == user_id).first()
         if user_to_delete:

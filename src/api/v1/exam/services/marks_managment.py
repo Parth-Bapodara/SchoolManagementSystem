@@ -1,11 +1,10 @@
 from sqlalchemy.orm import Session
 from src.api.v1.user.models.user_models import User
 from src.api.v1.exam.models.exam_models import ExamSubmission, Exam
-from src.api.v1.exam.schemas.exam_schemas import ExamSubmissionCreate, ExamSubmissionResponse
 from src.api.v1.utils.response_utils import Response
 from fastapi.responses import FileResponse
 from fastapi.exceptions import HTTPException
-from botocore.exceptions import NoCredentialsError,PartialCredentialsError,ClientError
+from botocore.exceptions import ClientError
 from Config.config import settings
 import os,boto3,logging
 
@@ -16,26 +15,21 @@ class ExamSubmissionServices:
         """
         Check if the exam has a PDF in S3 and generate a pre-signed URL for download.
         """
-        # Fetch the exam from the database
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
         
         if not exam:
-            raise HTTPException(status_code=404, detail="Exam not found.")
+            return Response(status_code=404, message="Exam not found.", data={}).send_error_response()
         
-        # Ensure the exam is in a scheduled state
         if exam.status != "scheduled":
-            raise HTTPException(status_code=400, detail="Exam is not scheduled yet.")
+            return Response(status_code=400, message="Exam is not scheduled yet.", data={}).send_error_response()
 
-        # Check if the exam has a PDF available
         if not exam.exam_pdf:
-            raise HTTPException(status_code=404, detail="No PDF file available for this exam.")
-        
-        # Extract the S3 bucket and key
+            return Response(status_code=404, message="No PDF file available for this exam.", data={}).send_error_response()
+    
         s3_bucket = settings.AWS_S3_BUCKET_NAME
         s3_key = exam.exam_pdf.replace(f"s3://{s3_bucket}/", "")
         
         try:
-            # Create S3 client
             s3 = boto3.client(
                 's3',
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -46,7 +40,7 @@ class ExamSubmissionServices:
 
         except ClientError as e:
             logging.error(f"Error accessing the file in S3: {str(e)}")
-            raise HTTPException(status_code=404, detail="PDF not found in S3.")
+            return Response(status_code=404, message="PDF not found in S3.", data={}).send_error_response()
         
         try:
             url = s3.generate_presigned_url(
@@ -63,7 +57,7 @@ class ExamSubmissionServices:
         
         except Exception as e:
             logging.error(f"Error generating pre-signed URL: {str(e)}")
-            raise HTTPException(status_code=500, detail="Error generating pre-signed URL.")
+            return Response(status_code=500, message="Error generating pre-signed URL.", data={}).send_error_response()
 
     @staticmethod
     def take_exam(db: Session, exam_id: int, answers: str, user_data: dict):

@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field, validator, EmailStr, model_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
 from typing import Literal,Optional
 import re
+from src.api.v1.utils.response_utils import Response
+from src.api.v1.utils.exception_utils import *
 from datetime import datetime,timedelta,timezone
 
 # User create Schema for user creation
@@ -10,15 +12,15 @@ class UserCreate(BaseModel):
     password: str = Field(...)
     role: Literal["student", "teacher", "admin"]
 
-    @validator('password')
+    @field_validator('password')
     def password_complexity(cls,value):
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
-            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character ")
+            raise ValueErrorExc("Password must contain an uppercase, lowercase, and atleast one special character")  
         if len(value) < 8:
             raise ValueError("Password should be minimum of 8 Characters.")
         return value
 
-    @validator('username')
+    @field_validator('username')
     def username_complexity(cls,value):
         if len(value) <= 3:
             raise ValueError("Username must be at least 3 or more then characters long")
@@ -26,7 +28,7 @@ class UserCreate(BaseModel):
             raise ValueError("Username can only contain alphanumeric characters without spaces or special characters")
         return value
     
-    @validator('email')
+    @field_validator('email')
     def email_complexity(cls,value):
         if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', value):
             raise ValueError("Invalid Email Format. Must contain '@' and valid domain.")
@@ -58,7 +60,7 @@ class UserInDb(BaseModel):
 class UserUpdate(BaseModel):
     password: Optional[str] = None
 
-    @validator('password')
+    @field_validator('password')
     def password_complexity(cls, value):
         if value and not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', value):
             raise ValueError("Password must contain an uppercase, lowercase, at least one digit, and at least one special character.")

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator, EmailStr, model_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr, model_validator
 from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta,timezone
@@ -14,7 +14,7 @@ class PasswordResetVerify(BaseModel):
     confirm_password: str
 
     # Optional: validate password complexity
-    @validator("new_password")
+    @field_validator("new_password")
     def validate_password(cls, password):
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long.")
@@ -24,7 +24,7 @@ class PasswordResetVerify(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
     
-    @validator("confirm_password")
+    @field_validator("confirm_password")
     def check_password_match(cls, confirm_password, values):
         if "new_password" in values and confirm_password != values["new_password"]:
             raise ValueError("The passwords do not match.")
@@ -36,7 +36,7 @@ class ChangePassword(BaseModel):
     new_password: str
     confirm_password: str
 
-    @validator("new_password")
+    @field_validator("new_password")
     def validate_password(cls, password):
         # Ensure the password is at least 8 characters, contains a digit and an uppercase letter
         if len(password) < 8:
@@ -47,7 +47,7 @@ class ChangePassword(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
 
-    @validator("confirm_password")
+    @field_validator("confirm_password")
     def check_password_match(cls, confirm_password, values):
         if "new_password" in values and confirm_password != values["new_password"]:
             raise ValueError("The passwords do not match.")

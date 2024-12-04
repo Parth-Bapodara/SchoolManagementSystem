@@ -1,6 +1,7 @@
 import logging,os
 from datetime import datetime, timezone
 from fastapi import UploadFile, File, HTTPException
+from datetime import timedelta
 from sqlalchemy.orm import Session
 from src.api.v1.exam.utils.s3_upload import upload_file_to_s3
 from src.api.v1.exam.models.exam_models import Exam
@@ -35,7 +36,7 @@ class ExamManagementServices:
             upload_successful = upload_file_to_s3(exam_pdf.file, settings.AWS_S3_BUCKET_NAME, exam_pdf_filename)
 
             if not upload_successful:
-                raise HTTPException(status_code=500, detail="Error uploading PDF file to S3.")
+                return Response(status_code=500, message="Error uploading PDF file to S3.", data={}).send_error_response()
 
             exam_pdf_path = f"s3://{settings.AWS_S3_BUCKET_NAME}/{exam_pdf_filename}"
 
@@ -152,7 +153,6 @@ class ExamManagementServices:
             return Response(status_code=200, message="Exam deleted successfully.", data={}).send_success_response()
 
         return Response(status_code=400, message="You cannot delete an exam that has already started or finished.", data={}).send_error_response()
-
 
 
 

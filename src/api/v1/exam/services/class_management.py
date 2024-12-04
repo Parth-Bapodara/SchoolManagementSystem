@@ -63,7 +63,7 @@ class ClassSubjectServices:
         if not classes:
             if skip >= total_classes:
                 return Response(
-                    status_code=400,  # Bad Request for invalid pagination
+                    status_code=400,  
                     message="Page exceeds the number of available classes.", 
                     data={}
                 ).send_error_response()
