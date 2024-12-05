@@ -47,7 +47,6 @@ async def create_exam(
             date=exam_date,
             duration=duration
         )
-
         return await ExamManagementServices.create_exam(
             exam_data=exam_data_parsed,
             db=db,
@@ -58,17 +57,17 @@ async def create_exam(
     except Exception as e:
         return Response(status_code=500, message=str(e), data={}).send_error_response()
 
-# @router.get("/exams/")
-# async def get_all_exams(
-#     db: Session = Depends(get_db), 
-#     user_data: dict = Depends(get_current_user),
-#     page: int = 1,
-#     limit: int = 10
-# ):
-#     """
-#     Get all exams with pagination
-#     """
-#     return ExamManagementServices.get_all_exams(db, user_data, page, limit)
+@router.get("/exams/")
+async def get_all_exams(
+    db: Session = Depends(get_db), 
+    user_data: dict = Depends(get_current_user),
+    page: int = 1,
+    limit: int = 5
+):
+    """
+    Get all exams with pagination
+    """
+    return ExamManagementServices.get_all_exams(db, user_data, page, limit)
 
 @router.put("/exams/{exam_id}")
 async def update_exam(

@@ -10,6 +10,8 @@ from src.api.v1.user.views.user_nomral_login import router as User_Login
 from src.api.v1.user.views.forgot_password import router as Forgot_Password
 from src.api.v1.attendance.view.views import router as attendance_services
 
+from src.api.v1.user.views.forgot_pass_mobile import router as Forgot_Pass_Mobile
+
 router = APIRouter()
 
 router.include_router(user_management_router,tags=["User Management"])
@@ -22,4 +24,5 @@ router.include_router(Marks_management, tags=["Marks Management"])
 router.include_router(User_Login, tags=["User Login"])
 router.include_router(Forgot_Password, tags=["Forgot Password"])
 router.include_router(attendance_services, tags=["Attendance Management"])
+router.include_router(Forgot_Pass_Mobile, tags=["Test Router"])
 

@@ -39,7 +39,7 @@ async def protected_endpoint(token: str = Depends(JWTBearer()), db: Session = De
     response = LoginServices.verify_token_and_get_user(db, token)
     return response
 
-@router.get("/login/facebook", summary="Login with Facebook", description="Redirects the user to the Facebook Login page.\n\n**Select the link below to login with facebook:**\n\n[Login with Facebook](http://127.0.0.1:8000/login/facebook)")
+@router.get("/login/facebook", summary="Login with Facebook", description="Redirects the user to the Facebook Login page.\n\n**Select the link below to login with facebook:**\n\n[Login with Facebook](http://localhost:8000/login/facebook)")
 async def facebook_login(request:Request):
     """
     Initiates the Google OAuth2 login flow.

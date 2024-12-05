@@ -17,16 +17,13 @@ class UserService:
             logging.error(f"User with email {email} not found.")
             return Response(status_code=404, message="User not found in our system. Check your email and please try again.", data={}).send_error_response()
 
-        # Generate reset code and expiry time
         reset_code = generate_verification_code()
         expiry_time = datetime.utcnow() + timedelta(minutes=15)
 
-        # Create a reset request in the database
         reset_request = PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
         db.add(reset_request)
         db.commit()
 
-        # Send reset email with verification code
         try:
             await send_verification_email(email, reset_code)
         except Exception as e:

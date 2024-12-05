@@ -1,4 +1,4 @@
-import logging,os
+import logging,os,dateutil.parser
 from datetime import datetime, timezone
 from fastapi import UploadFile, File, HTTPException
 from datetime import timedelta
@@ -28,6 +28,14 @@ class ExamManagementServices:
         class_ = db.query(Class).filter(Class.id == exam_data.class_id).first()
         if not class_:
             return Response(status_code=404, message="Class not found.", data={}).send_error_response()
+        
+        # try:
+        #     exam_date = dateutil.parser.parse(ExamCreate.date) 
+        # except ValueError:
+        #     return Response(status_code=400, message="Invalid date format. Use ISO 8601 format.", data={}).send_error_response()
+        
+        # if exam_date.tzinfo is None:
+        #     exam_date = exam_date.replace(tzinfo=datetime.timezone.utc)
 
         exam_pdf_path = None
         if exam_pdf:
@@ -154,7 +162,51 @@ class ExamManagementServices:
 
         return Response(status_code=400, message="You cannot delete an exam that has already started or finished.", data={}).send_error_response()
 
+    @staticmethod
+    def get_all_exams(db: Session, user_data: dict, page:int, limit:int):
+        """
+        Get all subjects with pagination (maximum 5 records per page).
+        """
+        if user_data["role"] not in ["student", "teacher"]:
+            return Response(
+                status_code=403, 
+                message="Only students and teachers can see this information.", 
+                data={}
+            ).send_error_response()
+        
+        limit = min(limit, 5) 
 
+        total_exams = db.query(Exam).count()
+        skip = (page - 1) * limit
+
+        exams = db.query(Exam).offset(skip).limit(limit).all()
+        if not exams:
+            if skip >= total_exams:
+                return Response(
+                    status_code=404, 
+                    message="Page exceeds the number of available exams.", 
+                    data={}
+                ).send_error_response()
+            return Response(
+                status_code=404, 
+                message="No exams found.", 
+                data={}
+            ).send_error_response()
+        
+        total_pages = (total_exams + limit - 1) // limit
+
+        return Response(
+            status_code=200, 
+            message="Exams retrieved successfully.", 
+            data={ 
+                "exams": exams, 
+                "total_exams": total_exams, 
+                "total_pages": total_pages, 
+                "page": page, 
+                "limit": limit
+            }
+        ).send_success_response()
+    
 
 #local storage approch for storing files
 # UPLOAD_DIR = "uploads/exam_papers"

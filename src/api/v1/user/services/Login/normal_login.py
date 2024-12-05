@@ -2,17 +2,15 @@ from fastapi import HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from google.auth.transport.requests import Request
-import google.auth
 from src.api.v1.user.models.user_models import User
 from src.api.v1.security import security
 from src.api.v1.utils.response_utils import Response
 from sqlalchemy.exc import IntegrityError
 from src.api.v1.user.utils.google_auth import oauth
 from src.api.v1.user.utils.facebook_auth import oauth_1
-from dotenv import load_dotenv
-import logging,os
-
-load_dotenv()
+#from src.api.v1.user.utils.apple_auth import oauth_apple
+import logging
+from src.api.v1.security.security import get_password_hash
 
 class LoginServices:
 
@@ -74,10 +72,11 @@ class LoginServices:
                     "User_Data": user_data
                 }).send_success_response()
 
+            hashed_password = get_password_hash("Test@123")
             new_user = User(
                 email=user_email,
                 username=username, 
-                hashed_password="Test@123", 
+                hashed_password=hashed_password,
                 role="student", 
                 status="active",
             )
@@ -191,11 +190,13 @@ class LoginServices:
                     "token_type": "bearer",
                     "User_Data": user_data
                 }).send_success_response()
-
+            
+            hashed_password = get_password_hash("Test@123")
+            print(hashed_password)
             new_user = User(
                 email=user_email,
                 username=username, 
-                hashed_password="test@123",
+                hashed_password=hashed_password,
                 role="student", 
                 status="active",
             )
@@ -204,7 +205,7 @@ class LoginServices:
                 db.commit() 
             except IntegrityError:
                 db.rollback()
-                raise HTTPException(status_code=400, detail="Error creating user, possibly a duplicate.")
+                return Response(status_code=400, message="Error creating user, possibly a duplicate.", data={}).send_error_response()
             
             user_data = {"user_id": new_user.id, "role": new_user.role, "Mail": new_user.email, "Username": new_user.username, "Status": new_user.status}
             access_token = security.create_access_token(data=user_data)
@@ -216,5 +217,26 @@ class LoginServices:
             }).send_success_response()
 
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Error occurred during Facebook login: {str(e)}")
+            return Response(status_code=400, message=f"Error occurred during Facebook login: {str(e)}", data={}).send_error_response()
 
+    @staticmethod
+    async def apple_login(request: Request):
+        """
+        Initiates the Apple OAuth2 login flow.
+        This method will redirect the user to Apple's OAuth2 page for authentication.
+        """
+        redirect_uri = "http://127.0.0.1:8000/apple/callback"
+        return await oauth_apple.apple.authorize_redirect(request, redirect_uri)
+    
+    @staticmethod
+    async def apple_callback(request: Request):
+        try:
+            token = await oauth_1.facebook.authorize_access_token(request)
+            
+            user_info = await oauth_1.facebook.get("https://graph.facebook.com/me?fields=id,name,email", token=token)
+
+            if user_info.status_code != 200:
+                logging("data fetched successfully")
+                return Response(status_code=400, message="Failed to fetch user information from Facebook.", data={}).send_error_response()
+        except Exception as e:
+            return Response(status_code=400, message=f"Error occurred during Apple login: {str(e)}", data={}).send_error_response()

@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     FACEBOOK_CLIENT_SECRET: str
     FACEBOOK_API_VERSION: str
 
+    # APPLE_CLIENT_ID: str
+    # APPLE_TEAM_ID: str
+    # APPLE_KEY: str
+    # APPLE_SECRET_ID: str
+
+    TWILIO_ACCOUNT_SID: str
+    TWILIO_AUTH_TOKEN: str
+    TWILIO_PHONE_NUMBER: int
+
     class Config():
         env_file = ".env"
     

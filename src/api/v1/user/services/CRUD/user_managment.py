@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from src.api.v1.user.models.user_models import User
-from src.api.v1.security.security import SECRET_KEY, ALGORITHM, get_password_hash, decode_access_token  # Import the decode_access_token function
+from src.api.v1.security.security import SECRET_KEY, ALGORITHM, get_password_hash, decode_access_token 
 from fastapi import HTTPException, status
 from src.api.v1.utils.response_utils import Response
 from src.api.v1.user.schemas.user_schemas import UserCreate, UserUpdate, UserInDb
@@ -19,14 +19,12 @@ class UserServices:
         try:
             logger.info(f"Received token: {token}")
             
-            # Decode the token using decode_access_token
-            user_data_decoded = decode_access_token(token)  # Decode the raw JWT token here
+            user_data_decoded = decode_access_token(token)
             logging.info(f"Decoded token: {user_data_decoded}")
         except Exception as e:
             logging.error(f"Error decoding token: {str(e)}")
             return Response(status_code=403, message="Token is invalid or expired.", data={}).send_error_response()
 
-        # Check if the role is "admin"
         if user_data_decoded.get("role") != "admin":
             logging.warning("Unauthorized access attempt")
             return Response(
@@ -83,7 +81,7 @@ class UserServices:
         if user_to_delete:
             db.delete(user_to_delete)
             db.commit()
-            return {"message": "User deleted successfully."}
+            return Response(status_code=200, message="User deleted successfully.", data={user_to_delete})
         
         return Response(status_code=404, message="User not found", data={}).send_error_response()
 

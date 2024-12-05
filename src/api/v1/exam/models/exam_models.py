@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Float, Boolean
 from Database.database import Base
 from sqlalchemy.orm import relationship
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,timezone
 
 #DB model representing an exam with diffrent fields.
 class Exam(Base):
@@ -19,6 +19,10 @@ class Exam(Base):
     submissions = relationship("ExamSubmission", back_populates="exam")
     subject = relationship("Subject", back_populates="exams")
     class_ = relationship("Class", back_populates="exams")
+
+    def update_status(self):
+        if self.date < datetime.now(datetime.UTC):
+            self.status = "inactive"
 
 #DB model to track and manage student marks
 class ExamSubmission(Base):

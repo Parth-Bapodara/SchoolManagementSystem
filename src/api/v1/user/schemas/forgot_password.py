@@ -55,3 +55,11 @@ class ChangePassword(BaseModel):
 #to pass simple message
 class Message(BaseModel):
     message:str
+
+class Phone(BaseModel):
+    phone_number: str
+
+class VerifyOTP(BaseModel):
+    phone_number: str
+    otp: str
+    

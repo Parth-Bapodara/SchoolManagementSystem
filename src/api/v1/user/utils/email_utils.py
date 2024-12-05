@@ -4,6 +4,7 @@ import random,os,smtplib
 from Config.config import settings
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from twilio.rest import Client
 import logging
 
 class EmailSettings(BaseModel):
@@ -33,6 +34,12 @@ conf = ConnectionConfig(
 
 def generate_verification_code() -> str:
     return f"{random.randint(100000, 999999)}"
+
+client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+
+def send_otp(phone_number, otp):
+    message= f"Your OTP is: {otp}"
+    client.messages.create(to=phone_number, from_=settings.TWILIO_PHONE_NUMBER, body=message)
 
 def validate_email(email: str) -> bool:
     try:
