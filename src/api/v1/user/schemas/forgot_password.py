@@ -38,7 +38,6 @@ class ChangePassword(BaseModel):
 
     @field_validator("new_password")
     def validate_password(cls, password):
-        # Ensure the password is at least 8 characters, contains a digit and an uppercase letter
         if len(password) < 8:
             raise ValueError("Password must be at least 8 characters long.")
         if not any(char.isdigit() for char in password):
