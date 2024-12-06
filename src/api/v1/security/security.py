@@ -96,6 +96,7 @@ def authorize_user(token: str = Depends(JWTBearer()), db: Session = Depends(get_
         return Response(status_code=401, message="Token does not have the required user information.", data={}).send_error_response()
     
     user = db.query(User).filter(User.username == username).first() 
+
     if not user:
         return Response(status_code=401, message="User not found", data={}).send_error_response()
     

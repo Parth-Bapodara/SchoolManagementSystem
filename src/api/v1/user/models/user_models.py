@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, BigInteger
 from sqlalchemy.orm import relationship
 from Database.database import Base
 from src.api.v1.attendance.models.attendance_models import Attendance
@@ -15,6 +15,7 @@ class User(Base):
     role = Column(String, default="student", nullable=False)
     username = Column(String, unique=True, nullable=False)
     status = Column(String, default="active", nullable=False)
+    mobile_no = Column(BigInteger, nullable=False, default=0)
 
     attendances = relationship("Attendance", back_populates="user")
     exam_submissions = relationship("ExamSubmission", back_populates="student")

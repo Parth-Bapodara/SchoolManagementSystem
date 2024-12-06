@@ -10,12 +10,13 @@ class UserCreate(BaseModel):
     email: str 
     username: str 
     password: str = Field(...)
+    mobile_no: int = Field(..., example="911234567890")
     role: Literal["student", "teacher", "admin"]
 
     @field_validator('password')
     def password_complexity(cls,value):
         if not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\w).+$', value):
-            raise ValueErrorExc("Password must contain an uppercase, lowercase, and atleast one special character")  
+            raise ValueError("Password must contain an uppercase, lowercase, and atleast one special character")  
         if len(value) < 8:
             raise ValueError("Password should be minimum of 8 Characters.")
         return value
@@ -34,13 +35,22 @@ class UserCreate(BaseModel):
             raise ValueError("Invalid Email Format. Must contain '@' and valid domain.")
         return value
     
+    @field_validator('mobile_no')
+    def mobile_no_format(cls, value):
+
+        value_str= str(value)
+        if not re.match(r'^91\d{10}$', value_str):
+            raise ValueError("Mobile number must start with '91' followed by exactly 10 digits.")
+        return value
+    
     class Config:
         schema_extra = {
             "example": {
                 "email": "parth@example.com",
                 "password": "Pass@1234",
                 "username": "parth123",
-                "role": "student"
+                "role": "student",
+                "mobile_no": "911234567890"
             }
         }
         
@@ -49,6 +59,7 @@ class UserInDb(BaseModel):
     id: int
     hashed_password: str
     status: str = "active"
+    mobile_no: int
     email: str
     username: str
     role: str

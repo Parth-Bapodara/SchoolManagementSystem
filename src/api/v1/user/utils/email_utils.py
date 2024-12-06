@@ -37,18 +37,9 @@ def generate_verification_code() -> str:
 
 client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-def send_otp(phone_number, otp):
+def send_otp(phone_number: int, otp: int):
     message= f"Your OTP is: {otp}"
     client.messages.create(to=phone_number, from_=settings.TWILIO_PHONE_NUMBER, body=message)
-
-def validate_email(email: str) -> bool:
-    try:
-        domain = email.split("@")[1]
-        smtp = smtplib.SMTP(f"smtp.{domain}", timeout=5)
-        smtp.quit()
-        return True
-    except:
-        return False
 
 async def send_verification_email(recipient_email: str, reset_code: str) -> None:
     """Send a password reset email with a verification code."""
@@ -76,4 +67,3 @@ async def send_verification_email(recipient_email: str, reset_code: str) -> None
 
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
-

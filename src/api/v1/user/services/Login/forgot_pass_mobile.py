@@ -17,7 +17,7 @@ class MobileOTPGenration:
         stored_otp = otp_storage.get(otp_data.phone_number)
 
         if not stored_otp:
-            return Response(status_code=400, message="OTP not found", data={}).send_error_response()
+            return Response(status_code=400, message="OTP not found.Kindly check Phone number and Enterted OTP are correct.", data={}).send_error_response()
         
         if stored_otp != otp_data.otp:
             return Response(status_code=400, message="Inavlid OTP. Kindly check and input again", data={}).send_error_response()

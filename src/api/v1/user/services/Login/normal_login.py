@@ -24,7 +24,7 @@ class LoginServices:
         if not user or not security.verify_password(password, user.hashed_password):
             return Response(status_code=401, message="Incorrect username or password", data={}).send_error_response()
         
-        user_data = {"user_id": user.id, "role": user.role, "Mail": user.email, "Username": user.username, "Status": user.status}
+        user_data = {"user_id": user.id, "role": user.role, "Mail": user.email, "Username": user.username, "Status": user.status, "Mobile_no": user.mobile_no}
         access_token = security.create_access_token(data=user_data)
 
         return Response(status_code=200, message="Login successful", data={

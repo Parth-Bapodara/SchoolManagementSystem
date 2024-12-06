@@ -59,7 +59,7 @@ class UserService:
             "limit": limit,
             "total_users": total_users, 
             "total_pages": total_pages, 
-            f"{role}s": [{"Email": user.email, "Role": user.role, "ID": user.id, "User_name": user.username, "Status": user.status} for user in users]}
+            f"{role}s": [{"Email": user.email, "Role": user.role, "ID": user.id, "User_name": user.username, "Status": user.status, "Mobile No": user.mobile_no} for user in users]}
         ).send_success_response()
 
 # Helper function to extract user from the token

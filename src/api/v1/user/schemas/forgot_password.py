@@ -24,11 +24,12 @@ class PasswordResetVerify(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
     
-    @field_validator("confirm_password")
-    def check_password_match(cls, confirm_password, values):
-        if "new_password" in values and confirm_password != values["new_password"]:
-            raise ValueError("The passwords do not match.")
-        return confirm_password
+    @model_validator(mode="before")
+    def check_password_match(cls, values):
+        if "new_password" in values and "confirm_password" in values:
+            if values["new_password"] != values["confirm_password"]:
+                raise ValueError("The passwords do not match.")
+        return values
 
 #to change user password
 class ChangePassword(BaseModel):
@@ -46,11 +47,12 @@ class ChangePassword(BaseModel):
             raise ValueError("Password must contain at least one uppercase letter.")
         return password
 
-    @field_validator("confirm_password")
-    def check_password_match(cls, confirm_password, values):
-        if "new_password" in values and confirm_password != values["new_password"]:
-            raise ValueError("The passwords do not match.")
-        return confirm_password
+    @model_validator(mode="before")
+    def check_password_match(cls, values):
+        if "new_password" in values and "confirm_password" in values:
+            if values["new_password"] != values["confirm_password"]:
+                raise ValueError("The passwords do not match.")
+        return values
     
 #to pass simple message
 class Message(BaseModel):
@@ -60,6 +62,6 @@ class Phone(BaseModel):
     phone_number: str
 
 class VerifyOTP(BaseModel):
-    phone_number: str
+    phone_number: int
     otp: str
     

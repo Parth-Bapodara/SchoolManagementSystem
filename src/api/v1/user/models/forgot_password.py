@@ -18,3 +18,4 @@ class PasswordResetRequest(Base):
         self.user_id = user_id
         self.reset_code = reset_code
         self.expiry_time = expiry_time
+                                                                                            

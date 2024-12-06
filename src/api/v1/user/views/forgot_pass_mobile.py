@@ -8,4 +8,6 @@ router = APIRouter()
 async def send_otp_route(phone: Phone):
     return MobileOTPGenration.send_otp_route(phone)
 
-
+@router.post("/verify-otp")
+async def verify_otp_route(otp_data:VerifyOTP):
+    return MobileOTPGenration.verify_otp_route(otp_data)

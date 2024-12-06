@@ -40,6 +40,8 @@ class UserServices:
                 return Response(status_code=400, message="Email already in use.", data={}).send_error_response()
             elif existing_user.username == user_data.username:
                 return Response(status_code=400, message="Username already in use.", data={}).send_error_response()
+            elif existing_user.mobile_no == user_data.mobile_no:
+                return Response(status_code=400, message="Mobile Number already Exists.", data={}).send_error_response()
 
         hashed_password = get_password_hash(user_data.password)
         db_user = User(
@@ -47,20 +49,21 @@ class UserServices:
             hashed_password=hashed_password,
             role=user_data.role,
             username=user_data.username,
-            status="active"
+            status="active",
+            mobile_no = user_data.mobile_no
         )
 
         db.add(db_user)
         db.commit()
         db.refresh(db_user)
 
-        return {"msg": f"{user_data.role.capitalize()} created successfully", "email": db_user.email, "id": db_user.id, "role": db_user.role}
+        return {"msg": f"{user_data.role.capitalize()} created successfully", "email": db_user.email, "id": db_user.id, "role": db_user.role, "mobile_no": db_user.mobile_no}
 
     @staticmethod
     def get_user_info(db: Session, token: str):
         try:
             user_data = decode_access_token(token)
-            user_id = user_data["sub"]  # Assuming 'sub' holds the user_id
+            user_id = user_data["sub"]  
         except Exception as e:
             return Response(status_code=403, message="Invalid or expired token", data={}).send_error_response()
 
