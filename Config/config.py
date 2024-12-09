@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     TWILIO_AUTH_TOKEN: str
     TWILIO_PHONE_NUMBER: int
 
+    OPENWEATHER_API_KEY: str
+    
     class Config():
         env_file = ".env"
     

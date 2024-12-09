@@ -12,6 +12,8 @@ from src.api.v1.attendance.view.views import router as attendance_services
 
 from src.api.v1.user.views.forgot_pass_mobile import router as Forgot_Pass_Mobile
 
+from src.api.v1.weather.views.weather_views import router as Weather_Router
+
 router = APIRouter()
 
 router.include_router(user_management_router,tags=["User Management"])
@@ -25,4 +27,5 @@ router.include_router(User_Login, tags=["User Login"])
 router.include_router(Forgot_Password, tags=["Forgot Password"])
 router.include_router(attendance_services, tags=["Attendance Management"])
 router.include_router(Forgot_Pass_Mobile, tags=["Test Router"])
+router.include_router(Weather_Router, tags=["Weather Information"])
 

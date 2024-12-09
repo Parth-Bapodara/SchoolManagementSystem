@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from src.api.v1.user.utils.email_utils import send_verification_email, generate_verification_code, send_otp
 from src.api.v1.user.models.user_models import User
 from src.api.v1.user.models.forgot_password import PasswordResetRequest
-from src.api.v1.user.schemas.forgot_password import ChangePassword,PasswordResetVerify,Message
+from src.api.v1.user.schemas.forgot_password import ChangePassword,PasswordResetVerify,Message, PasswordResetVerifyMob
 from src.api.v1.security import security
 import logging
 from src.api.v1.utils.response_utils import Response
@@ -43,14 +43,13 @@ class UserService:
         if not reset_request:
             return Response(status_code=400, message="Invalid code or email", data={}).send_error_response()
 
-        if reset_request.expiry_time < datetime.utcnow():
+        if reset_request.expiry_time < datetime.now(timezone.utc).replace(tzinfo=None):
             return Response(status_code=400, message="Reset code has expired", data={}).send_error_response()
 
         user = db.query(User).filter(User.email == data.email).first()
         if not user:
             return Response(status_code=404, message="User not found", data={}).send_error_response()
 
-        # At this point, password validation is already done by Pydantic validators
         user.hashed_password = security.get_password_hash(data.new_password)
         db.commit()
 
@@ -102,29 +101,36 @@ class UserService:
         logging.info(f"Verification code sent to {mobile_no}")
         return Response(status_code=200, message="Verification code sent to your mobile number", data={}).send_success_response()
 
-    # @staticmethod
-    # async def password_reset(data: PasswordResetVerify, db: Session):
-    #     """Reset the user's password."""
-    #     reset_request = db.query(PasswordResetRequest).join(User).filter(
-    #         User.email == data.email, PasswordResetRequest.reset_code == data.code
-    #     ).first()
+    @staticmethod
+    async def password_reset_mob(data: PasswordResetVerifyMob, db: Session):
+        """Reset the user's password."""
+        reset_request = db.query(PasswordResetRequest).join(User).filter(
+            User.mobile_no == data.mobile_no, PasswordResetRequest.reset_code == data.code
+        ).first()
 
-    #     if not reset_request:
-    #         return Response(status_code=400, message="Invalid code or email", data={}).send_error_response()
+        if not reset_request:
+            return Response(status_code=400, message="Invalid code or Mobile Number", data={}).send_error_response()
+        
+        # if reset_request.expiry_time:
+        #     reset_time = reset_request.expiry_time
+        #     if reset_time.tzinfo is None:
+        #         reset_time = reset_time(tzinfo=timezone.utc)
 
-    #     if reset_request.expiry_time < datetime.utcnow():
-    #         return Response(status_code=400, message="Reset code has expired", data={}).send_error_response()
+        #     if reset_time < datetime.now(tz=timezone.utc):
+        #         return Response(status_code=400, message="Reset code has expired", data={}).send_error_response()
 
-    #     user = db.query(User).filter(User.email == data.email).first()
-    #     if not user:
-    #         return Response(status_code=404, message="User not found", data={}).send_error_response()
+        if reset_request.expiry_time < datetime.now(timezone.utc).replace(tzinfo=None):
+            return Response(status_code=400, message="Reset code has expired", data={}).send_error_response()
+        
+        user = db.query(User).filter(User.mobile_no == data.mobile_no).first()
+        if not user:
+            return Response(status_code=404, message="User not found", data={}).send_error_response()
 
-    #     # At this point, password validation is already done by Pydantic validators
-    #     user.hashed_password = security.get_password_hash(data.new_password)
-    #     db.commit()
+        user.hashed_password = security.get_password_hash(data.new_password)
+        db.commit()
 
-    #     db.delete(reset_request) 
-    #     db.commit()
+        db.delete(reset_request) 
+        db.commit()
 
-    #     logging.info(f"Password reset successfully for user {user.email}")
-    #     return Response(status_code=200, message="Password reset successfully.", data={}).send_success_response()
+        logging.info(f"Password reset successfully for user {user.email}")
+        return Response(status_code=200, message="Password reset successfully.", data={}).send_success_response()
