@@ -82,17 +82,18 @@ class ChangePassword(BaseModel):
 class Message(BaseModel):
     message:str
 
+#to pass mobile/phone number to generate OTP for password reset
 class Phone(BaseModel):
     phone_number: str
 
-class VerifyOTP(BaseModel):
-    mobile_no: str
-    otp: str
+# class VerifyOTP(BaseModel):
+#     mobile_no: str
+#     otp: str
     
-    @field_validator("mobile_no")
-    def validate_mobile(cls, mobile_no):
-        if len(mobile_no) < 12:
-            raise ValueError("Invalid or Missing Mobile Number.Please check and try again.")
+#     @field_validator("mobile_no")
+#     def validate_mobile(cls, mobile_no):
+#         if len(mobile_no) < 12:
+#             raise ValueError("Invalid or Missing Mobile Number.Please check and try again.")
         
         
     

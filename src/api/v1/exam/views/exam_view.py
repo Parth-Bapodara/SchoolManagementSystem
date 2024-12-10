@@ -5,21 +5,11 @@ from src.api.v1.exam.schemas.exam_schemas import ExamCreate, ExamUpdate
 from src.api.v1.exam.services.exam_management import ExamManagementServices
 from src.api.v1.utils.response_utils import Response
 from Database.database import get_db
-from src.api.v1.security.security import decode_access_token,JWTBearer,authorize_user
+from src.api.v1.security.security import get_logged_user
 import logging,json,datetime, dateutil.parser
 from typing import Dict
 
 router = APIRouter()
-
-async def get_current_user(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
-    try:
-        user_data = decode_access_token(token)
-        return user_data
-    except HTTPException:
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid token. Could not validate credentials."
-        )
 
 @router.post("/create-exam/")
 async def create_exam(
@@ -27,7 +17,7 @@ async def create_exam(
     class_id: int = Form(...),
     date: str = Form(...), 
     duration: int = Form(...),
-    user_data: Dict = Depends(get_current_user), 
+    user_data: Dict = Depends(get_logged_user), 
     exam_pdf: UploadFile = File(None),  
     db: Session = Depends(get_db) 
 ):
@@ -60,7 +50,7 @@ async def create_exam(
 @router.get("/exams/")
 async def get_all_exams(
     db: Session = Depends(get_db), 
-    user_data: dict = Depends(get_current_user),
+    user_data: dict = Depends(get_logged_user),
     page: int = 1,
     limit: int = 5
 ):
@@ -74,7 +64,7 @@ async def update_exam(
     exam_id: int, 
     exam_update: ExamUpdate, 
     db: Session = Depends(get_db), 
-    user_data: dict = Depends(get_current_user)
+    user_data: dict = Depends(get_logged_user)
 ):
     """
     Update an existing exam
@@ -85,7 +75,7 @@ async def update_exam(
 async def delete_exam(
     exam_id: int, 
     db: Session = Depends(get_db), 
-    user_data: dict = Depends(get_current_user)
+    user_data: dict = Depends(get_logged_user)
 ):
     """
     Delete an exam by ID

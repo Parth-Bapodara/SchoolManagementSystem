@@ -9,17 +9,9 @@ from src.api.v1.security.security import JWTBearer
 
 router = APIRouter()
 
-# This function will extract and decode the JWT token, returning the user data.
-async def get_current_user(token: str = Depends(security.JWTBearer()), db: Session = Depends(get_db)):
-    """
-    Decodes the JWT token and returns the user data.
-    """
-    user_data = security.decode_access_token(token)  # Decode the JWT token using the correct function
-    return user_data 
-
 # Route to create a new class
 @router.post("/create_class")
-def create_class(class_data: ClassCreate, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+def create_class(class_data: ClassCreate, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
     """
     Create a new class. Only accessible by admin or teacher.
     """
@@ -27,7 +19,7 @@ def create_class(class_data: ClassCreate, db: Session = Depends(get_db), user_da
 
 # Route to get all classes
 @router.get("/get_classes")
-def get_classes(page: int, limit: int, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+def get_classes(page: int , limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
     """
     Get all classes. Only accessible by admin or teacher.
     """
@@ -35,7 +27,7 @@ def get_classes(page: int, limit: int, db: Session = Depends(get_db), user_data:
 
 # Route to create a new subject
 @router.post("/create_subject")
-def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
     """
     Create a new subject. Only accessible by admin or teacher.
     """
@@ -43,7 +35,7 @@ def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), u
 
 # Route to get all subjects
 @router.get("/get_subjects")
-def get_subjects(page: int, limit: int, db: Session = Depends(get_db), user_data: dict = Depends(get_current_user)):
+def get_subjects(page: int, limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
     """
     Get all subjects. Only accessible by admin or teacher.
     """

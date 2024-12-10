@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
@@ -7,12 +7,15 @@ from sqlalchemy.orm import Session
 from Database.database import get_db
 from src.api.v1.user.models.user_models import User
 from src.api.v1.utils.response_utils import Response
+import logging
 
 SECRET_KEY = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+logger = logging.getLogger(__name__)
 
 class JWTBearer(HTTPBearer):
     def __init__(self, auto_error: bool = True):
@@ -45,7 +48,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     if "user_id" not in to_encode:
         return Response(status_code=400, message="User ID is required in the data", data={}).send_error_response()
 
-    expire = datetime.utcnow() + expires_delta if expires_delta else datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.now(timezone.utc).replace(tzinfo=None) + expires_delta if expires_delta else datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)
     to_encode.update({"sub": str(data["user_id"]), "exp": expire})
 
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -61,8 +64,9 @@ def decode_access_token(token: str):
         user_id = int(payload["sub"])  
         print(f"Decoded Token User ID: {user_id}")  
 
-        expiration_time = datetime.utcfromtimestamp(payload["exp"])
-        if expiration_time < datetime.utcnow():
+        expiration_time = datetime.fromtimestamp(payload["exp"])
+        logger.info(expiration_time)
+        if expiration_time < datetime.now(timezone.utc).replace(tzinfo=None):
             return Response(status_code=401, message="Token has expired", data={}).send_error_response()
         return payload 
 
@@ -73,6 +77,7 @@ def decode_access_token(token: str):
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+#used to hash the password received from user
 def get_password_hash(password):
     return pwd_context.hash(password)
 
@@ -119,12 +124,21 @@ def get_current_user(token: str = Depends(JWTBearer()), db: Session = Depends(ge
     """
     payload = decode_access_token(token)
 
-    username = payload.get("sub")
-    if not username:
+    userid = payload.get("sub")
+    if not userid:
         return Response(status_code=401, message="Token does not have the required user information.", data={}).send_error_response()
     
-    user = db.query(User).filter(User.username == username).first()
+    user = db.query(User).filter(User.id == userid).first()
+    print(user)
+
     if not user:
         return Response(status_code=401, message="User not found", data={})
     
     return user
+
+async def get_logged_user(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
+    """
+    Decodes the JWT token and returns the user data.
+    """
+    user_data = decode_access_token(token)
+    return user_data 

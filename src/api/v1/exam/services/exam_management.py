@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ExamManagementServices:
     @staticmethod
-    async def create_exam(db: Session, exam_data: ExamCreate, user_data: dict, exam_pdf: UploadFile = None):
+    def create_exam(db: Session, exam_data: ExamCreate, user_data: dict, exam_pdf: UploadFile = None):
         """
         Create a new exam and upload the exam PDF to S3 if provided.
         """
@@ -67,6 +67,7 @@ class ExamManagementServices:
             data={
                 "exam_id": new_exam.id,
                 "date": new_exam.date.isoformat(),
+                "created_by": new_exam.created_by,
                 "exam_pdf": exam_pdf_path if exam_pdf else None
             }
         ).send_success_response()

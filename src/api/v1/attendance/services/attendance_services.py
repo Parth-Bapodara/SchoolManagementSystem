@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from src.api.v1.attendance.models.attendance_models import Attendance
 from src.api.v1.utils.response_utils import Response
-from fastapi import HTTPException
-from src.api.v1.security.security import get_current_user  # Function to get current user from JWT
 from src.api.v1.user.models.user_models import User
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AttendanceServices:
 
@@ -13,13 +14,13 @@ class AttendanceServices:
         """
         Clock-in a user for the day.
         """
-        today_date = datetime.utcnow().date()
+        today_date = datetime.now(timezone.utc).replace(tzinfo=None).date()
 
         # Check if the user has already clocked in today (maximum of 5 clock-ins)
         today_clockins = db.query(Attendance).filter(
             Attendance.user_id == current_user.id,
             Attendance.clock_in >= datetime(today_date.year, today_date.month, today_date.day)
-        ).count()
+            ).count()
 
         if today_clockins >= 5:
             return Response(
@@ -29,7 +30,7 @@ class AttendanceServices:
             ).send_error_response()
 
         # Clock-in the user
-        attendance = Attendance(user_id=current_user.id, clock_in=datetime.utcnow())
+        attendance = Attendance(user_id=current_user.id, clock_in=datetime.now(timezone.utc).replace(tzinfo=None))
         db.add(attendance)
         db.commit()
         db.refresh(attendance)
@@ -59,8 +60,8 @@ class AttendanceServices:
             ).send_error_response()
 
         # Clock-out the user
-        attendance.clock_out = datetime.utcnow()
-        attendance.hours_worked = attendance.calculate_hours_worked()  # Assuming this method exists to calculate hours
+        attendance.clock_out = datetime.now(timezone.utc).replace(tzinfo=None)
+        attendance.hours_worked = attendance.calculate_hours_worked()  
         db.commit()
         db.refresh(attendance)
 
@@ -75,7 +76,7 @@ class AttendanceServices:
         """
         Get total hours worked and distinct days worked in the last week.
         """
-        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        one_week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
 
         # Query attendances in the last week for the current user
         attendances = db.query(Attendance).filter(
@@ -83,7 +84,6 @@ class AttendanceServices:
             Attendance.clock_in >= one_week_ago
         ).all()
 
-        # Calculate total hours worked and distinct days worked
         total_hours = sum(attendance.hours_worked for attendance in attendances if attendance.clock_out)
         worked_days = {attendance.clock_in.date() for attendance in attendances if attendance.clock_out}
         distinct_days_count = len(worked_days)

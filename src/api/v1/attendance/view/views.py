@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from src.api.v1.attendance.services.attendance_services import AttendanceServices
 from Database.database import get_db
-from src.api.v1.security.security import get_current_user  # Use the new function
+from src.api.v1.security.security import authorize_user, get_current_user
 from src.api.v1.user.models.user_models import User
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/clock-in")

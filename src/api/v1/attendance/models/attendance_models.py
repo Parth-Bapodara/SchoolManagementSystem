@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Float
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from Database.database import Base
 
 class Attendance(Base):
@@ -8,7 +8,7 @@ class Attendance(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    clock_in = Column(DateTime, default=datetime.utcnow)
+    clock_in = Column(DateTime, default=datetime.now(timezone.utc).replace(tzinfo=None))
     clock_out = Column(DateTime, nullable=True)
     hours_worked = Column(Float, default=0)
 

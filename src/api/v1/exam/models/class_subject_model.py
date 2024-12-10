@@ -8,7 +8,7 @@ class Class(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
-
+    
     exams = relationship("Exam", back_populates="class_")
 
     class Config:

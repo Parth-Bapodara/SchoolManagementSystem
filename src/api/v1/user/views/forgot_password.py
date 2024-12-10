@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from src.api.v1.user.schemas.forgot_password import PasswordResetRequest, PasswordResetVerify, ChangePassword, Phone, PasswordResetVerifyMob
 from src.api.v1.utils.response_utils import Response
-from src.api.v1.user.utils.forgot_password import UserService
+from src.api.v1.user.services.Login.user_auth import UserService
 from src.api.v1.security.security import JWTBearer
 from Database.database import get_db
 from src.api.v1.user.models.user_models import User
