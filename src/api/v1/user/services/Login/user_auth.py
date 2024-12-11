@@ -18,7 +18,7 @@ class UserService:
             return Response(status_code=404, message="User not found in our system. Check your email and please try again.", data={}).send_error_response()
 
         reset_code = generate_verification_code()
-        expiry_time = datetime.utcnow() + timedelta(minutes=15)
+        expiry_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)
 
         reset_request = PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
         db.add(reset_request)
@@ -41,14 +41,14 @@ class UserService:
         ).first()
 
         if not reset_request:
-            return Response(status_code=400, message="Invalid code or email", data={}).send_error_response()
+            return Response(status_code=400, message="Invalid code or email.Please check and Try again.", data={}).send_error_response()
 
         if reset_request.expiry_time < datetime.now(timezone.utc).replace(tzinfo=None):
-            return Response(status_code=400, message="Reset code has expired", data={}).send_error_response()
+            return Response(status_code=400, message="Reset code has expired.Please generate new one.", data={}).send_error_response()
 
         user = db.query(User).filter(User.email == data.email).first()
         if not user:
-            return Response(status_code=404, message="User not found", data={}).send_error_response()
+            return Response(status_code=404, message="User not found.Please check your Mail and Try again.", data={}).send_error_response()
 
         user.hashed_password = security.get_password_hash(data.new_password)
         db.commit()
@@ -81,12 +81,13 @@ class UserService:
     def password_reset_by_mobile(db: Session, mobile_no: int):
         """Request a password reset and send the verification code via mobile number"""
         user = db.query(User).filter(User.mobile_no == mobile_no).first()
+        logging.info(user)
         if not user:
-            logging.error(f"User with email {mobile_no} not found.")
+            logging.error(f"User with mobile number {mobile_no} not found.")
             return Response(status_code=404, message="User not found in our system. Check your number and please try again.", data={}).send_error_response()
 
         reset_code = generate_verification_code()
-        expiry_time = datetime.utcnow() + timedelta(minutes=15)
+        expiry_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15)
 
         reset_request = PasswordResetRequest(user_id=user.id, reset_code=reset_code, expiry_time=expiry_time)
         db.add(reset_request)

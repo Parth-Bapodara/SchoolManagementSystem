@@ -42,7 +42,7 @@ class ClassSubjectServices:
         ).send_success_response()
 
     @staticmethod
-    def get_all_classes(db: Session, user_data: dict, page: int, limit: int):
+    def get_all_classes(db: Session, user_data: dict, page: int, limit: int, query:str):
         """
         Get all classes with pagination (maximum 5 records per page).
         """
@@ -55,11 +55,17 @@ class ClassSubjectServices:
             ).send_error_response()
         
         limit = min(limit, 5)
-
-        total_classes = db.query(Class).count()
         skip = (page - 1) * limit
+        # total_classes = db.query(Class).count()
+        
+        search_query = f"%{query}%"
+        total_classes = db.query(Class).filter(Class.name.ilike(search_query)).count()
 
-        classes = db.query(Class).offset(skip).limit(limit).all()
+        classes = (db.query(Class).filter(Class.name.ilike(search_query)).offset(skip).limit(limit).all())
+
+        if not classes:
+            return Response(status_code=404, message="No classes found for given query.", data={}).send_error_response()
+        
         if not classes:
             if skip >= total_classes:
                 return Response(
@@ -120,7 +126,7 @@ class ClassSubjectServices:
         ).send_success_response()
 
     @staticmethod
-    def get_all_subjects(db: Session, user_data: dict, page: int, limit: int):
+    def get_all_subjects(db: Session, user_data: dict, page: int, limit: int, query:str):
         """
         Get all subjects with pagination (maximum 5 records per page).
         """
@@ -132,11 +138,16 @@ class ClassSubjectServices:
             ).send_error_response()
 
         limit = min(limit, 5) 
-
-        total_subjects = db.query(Subject).count()
         skip = (page - 1) * limit
+        
+        search_query = f"%{query}%"
+        total_subjects = db.query(Subject).filter(Subject.name.ilike(search_query)).count()
 
-        subjects = db.query(Subject).offset(skip).limit(limit).all()
+        subjects = (db.query(Subject).filter(Subject.name.ilike(search_query)).offset(skip).limit(limit).all())
+
+        if not subjects:
+            return Response(status_code=404, message="No subjects found for given query.", data={}).send_error_response()
+
         if not subjects:
             if skip >= total_subjects:
                 return Response(
@@ -164,3 +175,106 @@ class ClassSubjectServices:
                 "limit": limit
             }
         ).send_success_response()
+
+
+
+# class ClassSubjectServices:
+
+#     # Existing methods remain unchanged ...
+
+#     @staticmethod
+#     def search_classes(db: Session, user_data: dict, query: str, page: int, limit: int):
+#         """
+#         Search classes by a partial name match with pagination.
+#         """
+#         if user_data["role"] not in ["admin", "teacher"]:
+#             return Response(
+#                 status_code=403,
+#                 message="Only admins and teachers can search for classes.",
+#                 data={}
+#             ).send_error_response()
+
+#         limit = min(limit, 5)
+#         skip = (page - 1) * limit
+
+#         # Perform partial search using `ilike` for case-insensitive match
+#         search_query = f"%{query}%"
+#         total_classes = db.query(Class).filter(Class.name.ilike(search_query)).count()
+#         classes = (
+#             db.query(Class)
+#             .filter(Class.name.ilike(search_query))
+#             .offset(skip)
+#             .limit(limit)
+#             .all()
+#         )
+
+#         if not classes:
+#             return Response(
+#                 status_code=404,
+#                 message="No classes found matching the search query.",
+#                 data={}
+#             ).send_error_response()
+
+#         total_pages = (total_classes + limit - 1) // limit
+#         serialized_classes = jsonable_encoder(classes)
+
+#         return Response(
+#             status_code=200,
+#             message="Classes retrieved successfully.",
+#             data={
+#                 "classes": serialized_classes,
+#                 "total_classes": total_classes,
+#                 "total_pages": total_pages,
+#                 "page": page,
+#                 "limit": limit
+#             }
+#         ).send_success_response()
+
+#     @staticmethod
+#     def search_subjects(db: Session, user_data: dict, query: str, page: int, limit: int):
+#         """
+#         Search subjects by a partial name match with pagination.
+#         """
+#         if user_data["role"] not in ["admin", "teacher"]:
+#             return Response(
+#                 status_code=403,
+#                 message="Only admins and teachers can search for subjects.",
+#                 data={}
+#             ).send_error_response()
+
+#         limit = min(limit, 5)
+#         skip = (page - 1) * limit
+
+#         # Perform partial search using `ilike` for case-insensitive match
+#         search_query = f"%{query}%"
+#         total_subjects = db.query(Subject).filter(Subject.name.ilike(search_query)).count()
+#         subjects = (
+#             db.query(Subject)
+#             .filter(Subject.name.ilike(search_query))
+#             .offset(skip)
+#             .limit(limit)
+#             .all()
+#         )
+
+#         if not subjects:
+#             return Response(
+#                 status_code=404,
+#                 message="No subjects found matching the search query.",
+#                 data={}
+#             ).send_error_response()
+
+#         total_pages = (total_subjects + limit - 1) // limit
+#         serialized_subjects = jsonable_encoder(subjects)
+
+#         return Response(
+#             status_code=200,
+#             message="Subjects retrieved successfully.",
+#             data={
+#                 "subjects": serialized_subjects,
+#                 "total_subjects": total_subjects,
+#                 "total_pages": total_pages,
+#                 "page": page,
+#                 "limit": limit
+#             }
+#         ).send_success_response()
+

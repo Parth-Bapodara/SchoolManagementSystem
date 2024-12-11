@@ -9,10 +9,10 @@ class PasswordResetRequest(BaseModel):
 
 #to verify the generated user request for password reset
 class PasswordResetVerify(BaseModel):
-    email: EmailStr
-    code: str
-    new_password: str
-    confirm_password: str
+    email: EmailStr = Field(example="user@example.com")
+    code: str = Field(example="123456")
+    new_password: str = Field(example="Demo@1234")
+    confirm_password: str = Field(example="Demo@1234")
 
     # Optional: validate password complexity
     @field_validator("new_password")
@@ -33,9 +33,9 @@ class PasswordResetVerify(BaseModel):
         return values
 
 class PasswordResetVerifyMob(BaseModel):
-    code: str
-    new_password: str
-    confirm_password: str
+    code: str = Field(example="Test@1234")
+    new_password: str = Field(example="Demo@1234")
+    confirm_password: str = Field(example="Demo@1234")
 
     # Optional: validate password complexity
     @field_validator("new_password")
@@ -57,9 +57,9 @@ class PasswordResetVerifyMob(BaseModel):
 
 #to change user password
 class ChangePassword(BaseModel):
-    old_password: str
-    new_password: str
-    confirm_password: str
+    old_password: str = Field(example="Test@1234")
+    new_password: str = Field(example="Demo@1234")
+    confirm_password: str = Field(example="Demo@1234")
 
     @field_validator("new_password")
     def validate_password(cls, password):
@@ -84,7 +84,9 @@ class Message(BaseModel):
 
 #to pass mobile/phone number to generate OTP for password reset
 class Phone(BaseModel):
-    phone_number: str
+    phone_number: str = Field(example="911234567890")
+
+
 
 # class VerifyOTP(BaseModel):
 #     mobile_no: str

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src.api.v1.exam.utils.s3_upload import upload_file_to_s3
 from src.api.v1.exam.models.exam_models import Exam
 from src.api.v1.exam.models.class_subject_model import Class, Subject
-from src.api.v1.exam.schemas.exam_schemas import ExamCreate,ExamUpdate
+from src.api.v1.exam.schemas.exam_schemas import ExamCreate,ExamUpdate,ExamInDb
 from src.api.v1.utils.response_utils import Response
 from Config.config import settings
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ExamManagementServices:
     @staticmethod
-    def create_exam(db: Session, exam_data: ExamCreate, user_data: dict, exam_pdf: UploadFile = None):
+    async def create_exam(db: Session, exam_data: ExamCreate, user_data: dict, exam_pdf: UploadFile = None):
         """
         Create a new exam and upload the exam PDF to S3 if provided.
         """
@@ -47,7 +47,7 @@ class ExamManagementServices:
                 return Response(status_code=500, message="Error uploading PDF file to S3.", data={}).send_error_response()
 
             exam_pdf_path = f"s3://{settings.AWS_S3_BUCKET_NAME}/{exam_pdf_filename}"
-
+            
         new_exam = Exam(
             subject_id=exam_data.subject_id,
             class_id=exam_data.class_id,
@@ -66,6 +66,8 @@ class ExamManagementServices:
             message="Exam created successfully.",
             data={
                 "exam_id": new_exam.id,
+                "class_id": new_exam.class_id,
+                "subject_id": new_exam.subject_id,
                 "date": new_exam.date.isoformat(),
                 "created_by": new_exam.created_by,
                 "exam_pdf": exam_pdf_path if exam_pdf else None

@@ -6,7 +6,9 @@ from src.api.v1.user.services.Login.user_auth import UserService
 from src.api.v1.security.security import JWTBearer
 from Database.database import get_db
 from src.api.v1.user.models.user_models import User
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/password-reset-request/")
@@ -31,6 +33,7 @@ async def password_reset_by_mobile(data: Phone, db:Session = Depends(get_db)):
         return Response(status_code=400, message="Invalid phone number format", data={}).send_error_response()
     
     mobile_no = int(cleaned_phone_number)
+    
     return UserService.password_reset_by_mobile(db, mobile_no)
 
 @router.post("/reset-response-mobile")

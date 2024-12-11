@@ -30,6 +30,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     """
     return await LoginServices.google_callback(request, db)
 
+#Check if the user from login is new or old.
 @router.get("/protected-endpoint")
 async def protected_endpoint(token: str = Depends(JWTBearer()), db: Session = Depends(get_db)):
     """
@@ -39,6 +40,7 @@ async def protected_endpoint(token: str = Depends(JWTBearer()), db: Session = De
     response = LoginServices.verify_token_and_get_user(db, token)
     return response
 
+#Facebook Login
 @router.get("/login/facebook", summary="Login with Facebook", description="Redirects the user to the Facebook Login page.\n\n**Select the link below to login with facebook:**\n\n[Login with Facebook](http://localhost:8000/login/facebook)")
 async def facebook_login(request:Request):
     """

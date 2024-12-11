@@ -9,25 +9,26 @@ from src.api.v1.security.security import get_logged_user
 import logging,json,datetime, dateutil.parser
 from typing import Dict
 
+logger=logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/create-exam/")
 async def create_exam(
-    subject_id: int = Form(...),  
-    class_id: int = Form(...),
-    date: str = Form(...), 
-    duration: int = Form(...),
+    subject_id: int = Form(..., example=1),  
+    class_id: int = Form(..., example=1),
+    date: str = Form(..., example="2024-12-12T10:00:00Z"), 
+    duration: int = Form(..., example="60"),
     user_data: Dict = Depends(get_logged_user), 
     exam_pdf: UploadFile = File(None),  
     db: Session = Depends(get_db) 
 ):
     try:
-       
         try:
             exam_date = dateutil.parser.parse(date) 
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use ISO 8601 format.")
+            return Response(status_code=400, message="Invalid date format. Use ISO 8601 format.", data={}).send_error_response()
         
+        logger.info(user_data)
         if exam_date.tzinfo is None:
             exam_date = exam_date.replace(tzinfo=datetime.timezone.utc)
 
@@ -48,7 +49,7 @@ async def create_exam(
         return Response(status_code=500, message=str(e), data={}).send_error_response()
 
 @router.get("/exams/")
-async def get_all_exams(
+def get_all_exams(
     db: Session = Depends(get_db), 
     user_data: dict = Depends(get_logged_user),
     page: int = 1,
@@ -60,7 +61,7 @@ async def get_all_exams(
     return ExamManagementServices.get_all_exams(db, user_data, page, limit)
 
 @router.put("/exams/{exam_id}")
-async def update_exam(
+def update_exam(
     exam_id: int, 
     exam_update: ExamUpdate, 
     db: Session = Depends(get_db), 
@@ -72,7 +73,7 @@ async def update_exam(
     return ExamManagementServices.update_exam(db, exam_id, exam_update, user_data)
 
 @router.delete("/exams/{exam_id}")
-async def delete_exam(
+def delete_exam(
     exam_id: int, 
     db: Session = Depends(get_db), 
     user_data: dict = Depends(get_logged_user)

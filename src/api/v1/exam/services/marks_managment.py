@@ -16,6 +16,7 @@ class ExamSubmissionServices:
         Check if the exam has a PDF in S3 and generate a pre-signed URL for download.
         """
         exam = db.query(Exam).filter(Exam.id == exam_id).first()
+        logging.info(exam)
         
         if not exam:
             return Response(status_code=404, message="Exam not found.", data={}).send_error_response()

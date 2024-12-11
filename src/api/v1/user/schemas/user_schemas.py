@@ -10,6 +10,8 @@ class UserCreate(BaseModel):
     email: str 
     username: str 
     password: str = Field(...)
+    first_name: str
+    last_name: str
     mobile_no: int = Field(..., example="911234567890")
     role: Literal["student", "teacher", "admin"]
 
@@ -43,22 +45,29 @@ class UserCreate(BaseModel):
             raise ValueError("Mobile number must start with '91' followed by exactly 10 digits.")
         return value
     
-    class Config:
-        schema_extra = {
-            "example": {
-                "email": "parth@example.com",
-                "password": "Pass@1234",
-                "username": "parth123",
-                "role": "student",
-                "mobile_no": "911234567890"
-            }
+    #class Config:
+    model_config = {
+        "json_schema_extra": {
+            "example":
+                {
+                    "email": "parth@example.com",
+                    "password": "Pass@1234",
+                    "username": "parth123",
+                    "first_name": "Parth",
+                    "last_name": "Bapodara",
+                    "role": "student",
+                    "mobile_no": "911234567890",
+                }
         }
+    }
         
 #To check if a user is available in DB or not
 class UserInDb(BaseModel):
     id: int
     hashed_password: str
     status: str = "active"
+    first_name: str
+    last_name: str
     mobile_no: int
     email: str
     username: str
@@ -69,12 +78,13 @@ class UserInDb(BaseModel):
 
 #To update a user information like email,username,password
 class UserUpdate(BaseModel):
-    password: Optional[str] = None
+    first_name: str
+    last_name: str
 
-    @field_validator('password')
-    def password_complexity(cls, value):
-        if value and not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', value):
-            raise ValueError("Password must contain an uppercase, lowercase, at least one digit, and at least one special character.")
-        if value and len(value) < 8:
-            raise ValueError("Password should be a minimum of 8 characters.")
-        return value
+    # @field_validator('password')
+    # def password_complexity(cls, value):
+    #     if value and not re.match(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$', value):
+    #         raise ValueError("Password must contain an uppercase, lowercase, at least one digit, and at least one special character.")
+    #     if value and len(value) < 8:
+    #         raise ValueError("Password should be a minimum of 8 characters.")
+    #     return value

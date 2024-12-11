@@ -21,7 +21,7 @@ class Exam(Base):
     class_ = relationship("Class", back_populates="exams")
 
     def update_status(self):
-        if self.date < datetime.now(datetime.UTC):
+        if self.date < datetime.now(timezone.utc).replace(tzinfo=None):
             self.status = "inactive"
 
 #DB model to track and manage student marks

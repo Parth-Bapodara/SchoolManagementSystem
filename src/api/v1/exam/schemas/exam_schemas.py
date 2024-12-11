@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Literal,Optional
 import re
 from datetime import datetime,timedelta,timezone
@@ -10,8 +10,23 @@ class ExamCreate(BaseModel):
     date: datetime = Field(..., example="2024-12-03T10:00:00Z")
     duration: int = Field(..., example=60) 
 
+    # model_config=ConfigDict(from_attributes=True)
+
     class Config:
-        orm_mode = True
+        from_attributes = True
+    
+    # model_config={
+    #     "json_schema_extra": {
+    #         "example": [
+    #             {
+    #                 "subject_id": "1",
+    #                 "class_id": "1",
+    #                 "date-format": "2024-12-03T10:00:00Z",
+    #                 "duration_minutes": "60"
+    #             }
+    #         ]
+    #     }
+    # }
 
 #To check if the exam is present in DB or not
 class ExamInDb(BaseModel):

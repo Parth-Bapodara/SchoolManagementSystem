@@ -126,7 +126,8 @@ class LoginServices:
                     email=user_email,
                     username=username,  
                     role="student",  
-                    status="active",  
+                    status="active",
+                    mobile_no="911234567890"
                 )
                 db.add(new_user)
                 db.commit()
@@ -136,7 +137,8 @@ class LoginServices:
                     "role": new_user.role, 
                     "email": new_user.email, 
                     "username": new_user.username, 
-                    "status": new_user.status
+                    "status": new_user.status,
+                    "mobile_no": new_user.mobile_no
                 }
                 access_token = security.create_access_token(data=user_data)
 
@@ -147,14 +149,15 @@ class LoginServices:
                 "role": user.role, 
                 "email": user.email, 
                 "username": user.username, 
-                "status": user.status
+                "status": user.status,
+                "mobile_no": user.mobile_no
             }
             access_token = security.create_access_token(data=user_data)
 
             return {"message": "User already exists", "user": user, "access_token": access_token}
 
-        except Exception as e:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
+        except Exception:
+            return Response(status_code=401, message="Invalid or expired token", data={}).send_error_response()
 
     @staticmethod
     async def facebook_login(request: Request):

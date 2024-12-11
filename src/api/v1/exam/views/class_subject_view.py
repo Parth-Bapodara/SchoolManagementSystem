@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from src.api.v1.security import security  
 from src.api.v1.exam.models.class_subject_model import Class, Subject
@@ -19,11 +19,11 @@ def create_class(class_data: ClassCreate, db: Session = Depends(get_db), user_da
 
 # Route to get all classes
 @router.get("/get_classes")
-def get_classes(page: int , limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
+def get_classes(page: int , limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user), query: str = Query()):
     """
     Get all classes. Only accessible by admin or teacher.
     """
-    return ClassSubjectServices.get_all_classes(db, user_data, page, limit)
+    return ClassSubjectServices.get_all_classes(db, user_data, page, limit, query)
 
 # Route to create a new subject
 @router.post("/create_subject")
@@ -35,8 +35,8 @@ def create_subject(subject_data: SubjectCreate, db: Session = Depends(get_db), u
 
 # Route to get all subjects
 @router.get("/get_subjects")
-def get_subjects(page: int, limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user)):
+def get_subjects(page: int, limit: int, db: Session = Depends(get_db), user_data: dict = Depends(security.get_logged_user),query: str = Query()):
     """
     Get all subjects. Only accessible by admin or teacher.
     """
-    return ClassSubjectServices.get_all_subjects(db, user_data, page, limit)
+    return ClassSubjectServices.get_all_subjects(db, user_data, page, limit, query)

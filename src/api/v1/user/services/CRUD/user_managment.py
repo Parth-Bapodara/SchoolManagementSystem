@@ -53,6 +53,8 @@ class UserServices:
             hashed_password=hashed_password,
             role=user_data.role,
             username=user_data.username,
+            first_name = user_data.first_name,
+            last_name = user_data.last_name,
             status="active",
             mobile_no = user_data.mobile_no
         )
@@ -61,12 +63,40 @@ class UserServices:
         db.commit()
         db.refresh(db_user)
 
-        return {"msg": f"{user_data.role.capitalize()} created successfully", "email": db_user.email, "id": db_user.id, "role": db_user.role, "mobile_no": db_user.mobile_no}
+        return {"msg": f"{user_data.role.capitalize()} created successfully", "user-info": db_user}
+        #"email": db_user.email, "id": db_user.id, "role": db_user.role, "mobile_no": db_user.mobile_no}
 
     @staticmethod
-    def update_user(db:Session, user_data: UserUpdate, token:str):
-        pass
-    
+    def update_user(db:Session, user_update: UserUpdate, token:str):
+        try:
+            logger.info(f"Received token: {token}")
+            user_data_decoded = decode_access_token(token)
+            logging.info(f"Decoded token: {user_data_decoded}")
+        except Exception as e:
+            logging.error(f"Error decoding token: {str(e)}")
+            return Response(status_code=403, message="Token is invalid or expired.", data={}).send_error_response()
+
+        user_id = int(user_data_decoded.get("sub"))
+        current_user = db.query(User).filter(User.id == user_id).first()
+        if not current_user:
+            return Response(status_code=404, message="User not found.", data={}).send_error_response()
+        
+        if current_user:
+            if user_update.first_name == current_user.first_name:
+                return Response(status_code=400,message="Can't update First-Name.It is same as current one, Choose a diffrent One.", data={}).send_error_response()
+            if user_update.last_name == current_user.last_name:
+                return Response(status_code=400, message="Can't update Last-Name.It is same as current one, Choose a diffrent One.", data={}).send_error_response()
+
+        if user_update.first_name:
+            current_user.first_name = user_update.first_name
+        if user_update.last_name:
+            current_user.last_name = user_update.last_name
+
+        db.commit()
+        db.refresh(current_user)
+
+        return Response(status_code=201, message="User Data Updated successfully", data={current_user}).send_success_response()
+
     @staticmethod
     def get_user_info(db: Session, token: str):
         try:
