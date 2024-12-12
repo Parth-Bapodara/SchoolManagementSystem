@@ -8,6 +8,8 @@ from botocore.exceptions import ClientError
 from Config.config import settings
 import os,boto3,logging
 
+logger = logging.getLogger(__name__)
+
 class ExamSubmissionServices:
 
     @staticmethod
@@ -77,13 +79,15 @@ class ExamSubmissionServices:
             return Response(status_code=400, message="You have already submitted this exam.", data={}).send_error_response()
 
         submission = ExamSubmission(exam_id=exam_id, student_id=user_data["user_id"], answers=answers)
+        logger.info(submission)
+
         db.add(submission)
         db.commit()
         db.refresh(submission)
 
-        if exam.exam_pdf:
-            pdf_response = ExamSubmissionServices.get_exam_pdf_link(db, exam_id, user_data)
-            return pdf_response  
+        # if exam.exam_pdf:
+        #     pdf_response = ExamSubmissionServices.get_exam_pdf_link(db, exam_id, user_data)
+        #     return pdf_response  
 
         return Response(
             status_code=201,

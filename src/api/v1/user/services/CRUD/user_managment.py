@@ -7,6 +7,7 @@ from src.api.v1.utils.response_utils import Response
 from src.api.v1.user.schemas.user_schemas import UserCreate, UserUpdate, UserInDb
 from src.api.v1.security import security
 import logging
+from typing import Optional
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("uvicorn")
@@ -127,7 +128,7 @@ class UserServices:
         return Response(status_code=404, message="User not found", data={}).send_error_response()
 
     @staticmethod
-    def get_users_by_role(db: Session, token: str, role: str, page: int, limit: int):
+    def get_users_by_role(db: Session, token: str, role: str, page: int, limit: int, query:Optional[str]):
         """Fetch users by role (admin, student, or teacher)."""
         try:
             user_data = security.decode_access_token(token)
@@ -142,11 +143,15 @@ class UserServices:
             ).send_error_response()
 
         limit = min(limit, 5)
-
-        total_users= db.query(User).count()
         skip = (page - 1)* limit
 
-        users = db.query(User).filter(User.role == role).offset(skip).limit(limit).all()
+        search_query = f"%{query}%"
+        total_users= db.query(User).filter(User.username.ilike(search_query)).count()
+
+        users = db.query(User).filter(User.role == role, User.username.ilike(search_query)).offset(skip).limit(limit).all()
+        if not users:
+            return Response(status_code=404, message="No user with given username found", data={}).send_error_response()
+
         if not users:
             if skip >= total_users:
                 return Response(

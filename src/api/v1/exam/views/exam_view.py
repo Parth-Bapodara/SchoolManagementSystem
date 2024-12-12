@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, UploadFile, File, Form
+from fastapi import APIRouter, Depends, UploadFile, File, Form, Query
 from fastapi.exceptions import HTTPException
 from sqlalchemy.orm import Session
 from src.api.v1.exam.schemas.exam_schemas import ExamCreate, ExamUpdate
@@ -7,7 +7,7 @@ from src.api.v1.utils.response_utils import Response
 from Database.database import get_db
 from src.api.v1.security.security import get_logged_user
 import logging,json,datetime, dateutil.parser
-from typing import Dict
+from typing import Dict,Optional
 
 logger=logging.getLogger(__name__)
 router = APIRouter()
@@ -53,12 +53,13 @@ def get_all_exams(
     db: Session = Depends(get_db), 
     user_data: dict = Depends(get_logged_user),
     page: int = 1,
-    limit: int = 5
+    limit: int = 5,
+    Created_By: Optional[str] = Query(None)
 ):
     """
     Get all exams with pagination
     """
-    return ExamManagementServices.get_all_exams(db, user_data, page, limit)
+    return ExamManagementServices.get_all_exams(db, user_data, page, limit, Created_By)
 
 @router.put("/exams/{exam_id}")
 def update_exam(

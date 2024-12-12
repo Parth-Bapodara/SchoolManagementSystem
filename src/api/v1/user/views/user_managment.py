@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from src.api.v1.user.schemas.user_schemas import UserCreate, UserUpdate, UserInDb
 from src.api.v1.user.services.CRUD.user_managment import UserServices,DEFAULT_LIMIT,DEFAULT_PAGE
@@ -38,16 +38,16 @@ def delete_user(user_id: int, db: Session = Depends(get_db), user_data: dict = D
     return UserServices.delete_user(db=db, user_id=user_id, user_data=user_data)
 
 @router.get("/admins/")
-def get_admins(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT):
+def get_admins(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT, username:str=Query()):
     """Fetch admins from the database."""
-    return UserServices.get_users_by_role(db, token, "admin", page, limit)
+    return UserServices.get_users_by_role(db, token, "admin", page, limit, username)
 
 @router.get("/students/")
-def get_students(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT):
+def get_students(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT, username:str=Query()):
     """Fetch students from the database."""
-    return UserServices.get_users_by_role(db, token, "student", page, limit)
+    return UserServices.get_users_by_role(db, token, "student", page, limit, username)
 
 @router.get("/teachers/")
-def get_teachers(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT):
+def get_teachers(db: Session = Depends(get_db), token: str = Depends(security.JWTBearer()), page: int = DEFAULT_PAGE, limit: int = DEFAULT_LIMIT, username:str=Query()):
     """Fetch teachers from the database."""
-    return UserServices.get_users_by_role(db, token, "teacher", page, limit)
+    return UserServices.get_users_by_role(db, token, "teacher", page, limit, username)

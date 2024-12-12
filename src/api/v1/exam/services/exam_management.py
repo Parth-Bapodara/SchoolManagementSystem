@@ -1,7 +1,9 @@
 import logging,os,dateutil.parser
+from typing import Optional
 from datetime import datetime, timezone
 from fastapi import UploadFile, File, HTTPException
 from datetime import timedelta
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from src.api.v1.exam.utils.s3_upload import upload_file_to_s3
 from src.api.v1.exam.models.exam_models import Exam
@@ -28,6 +30,13 @@ class ExamManagementServices:
         class_ = db.query(Class).filter(Class.id == exam_data.class_id).first()
         if not class_:
             return Response(status_code=404, message="Class not found.", data={}).send_error_response()
+        
+        exam_date = exam_data.date
+        if exam_date.tzinfo is None:
+            exam_date = exam_date.replace(tzinfo=timezone.utc)
+        
+        if exam_date<datetime.now(timezone.utc):
+            return Response(status_code=400, message="Cannot create an exam with a past date or time.", data={}).send_error_response()
         
         # try:
         #     exam_date = dateutil.parser.parse(ExamCreate.date) 
@@ -166,49 +175,59 @@ class ExamManagementServices:
         return Response(status_code=400, message="You cannot delete an exam that has already started or finished.", data={}).send_error_response()
 
     @staticmethod
-    def get_all_exams(db: Session, user_data: dict, page:int, limit:int):
+    def get_all_exams(db: Session, user_data: dict, page:int, limit:int, query: Optional[str]):
         """
         Get all subjects with pagination (maximum 5 records per page).
         """
         if user_data["role"] not in ["student", "teacher"]:
-            return Response(
-                status_code=403, 
-                message="Only students and teachers can see this information.", 
-                data={}
-            ).send_error_response()
+            return Response(status_code=403, message="Only students and teachers can see this information.", data={}).send_error_response()
         
         limit = min(limit, 5) 
-
-        total_exams = db.query(Exam).count()
         skip = (page - 1) * limit
 
-        exams = db.query(Exam).offset(skip).limit(limit).all()
+        if not query:
+            total_exams = db.query(Exam).count()
+            exam_s =  db.query(Exam).filter().offset(skip).limit(limit).all()
+            if not exam_s:
+                if skip >= total_exams:
+                    return Response(status_code=400, message="Page exceeds the number of available classes.", data={}).send_error_response()
+                return Response(status_code=404, message="No classes found.", data={}).send_error_response()
+            total_pages = (total_exams + limit - 1) // limit
+            serialized_classes = jsonable_encoder(exam_s)
+
+            return Response(status_code=200, message="Classes retrieved successfully.",
+                            data={ 
+                                    "classes": serialized_classes, 
+                                    "total_classes": total_exams, 
+                                    "total_pages": total_pages, 
+                                    "page": page, 
+                                    "limit": limit
+                                }).send_success_response()
+        
+        search_query = query
+
+        total_exams = db.query(Exam).filter(Exam.created_by==(search_query)).count()
+        exams = (db.query(Exam).filter(Exam.created_by==(search_query)).offset(skip).limit(limit).all())
+
+        if not exams:
+            return Response(status_code=404, message="No Exams found by given created by ID.", data={}).send_error_response()
+    
         if not exams:
             if skip >= total_exams:
-                return Response(
-                    status_code=404, 
-                    message="Page exceeds the number of available exams.", 
-                    data={}
-                ).send_error_response()
-            return Response(
-                status_code=404, 
-                message="No exams found.", 
-                data={}
-            ).send_error_response()
+                return Response(status_code=404, message="Page exceeds the number of available exams.", data={}).send_error_response()
+            return Response(status_code=404, message="No exams found.", data={}).send_error_response()
         
         total_pages = (total_exams + limit - 1) // limit
 
-        return Response(
-            status_code=200, 
-            message="Exams retrieved successfully.", 
-            data={ 
-                "exams": exams, 
-                "total_exams": total_exams, 
-                "total_pages": total_pages, 
-                "page": page, 
-                "limit": limit
-            }
-        ).send_success_response()
+        return Response(status_code=200, message="Exams retrieved successfully.", 
+                        data=
+                        { 
+                            "exams": exams, 
+                            "total_exams": total_exams, 
+                            "total_pages": total_pages, 
+                            "page": page, 
+                            "limit": limit
+                        }).send_success_response()
     
 
 #local storage approch for storing files

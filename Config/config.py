@@ -2,7 +2,6 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 import boto3, os
 
-
 class Settings(BaseSettings):
     app_name: str = "School Management System"
     version: str = "1.0"

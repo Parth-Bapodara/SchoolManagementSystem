@@ -62,14 +62,14 @@ class UserService:
     @staticmethod
     async def change_password(data: ChangePassword, current_user: User, db: Session):
         """Change the user's current password."""
-        if not security.pwd_context.verify(data.old_password, current_user.hashed_password):
-            return Response(status_code=400, message="Incorrect old password", data={}).send_error_response()
+        if not security.verify_password(data.old_password , current_user.hashed_password):            
+            return await Response(status_code=400, message="Incorrect old password", data={}).send_error_response()
 
         if data.new_password != data.confirm_password:
-            return Response(status_code=400, message="New password and confirm password do not match", data={}).send_error_response()
+            return await Response(status_code=400, message="New password and confirm password do not match", data={}).send_error_response()
 
         if len(data.new_password) < 8 or not any(char.isdigit() for char in data.new_password) or not any(char.isupper() for char in data.new_password):
-            return Response(status_code=400, message="Password must be at least 8 characters long, contain one digit, and one uppercase letter", data={}).send_error_response()
+            return await Response(status_code=400, message="Password must be at least 8 characters long, contain one digit, and one uppercase letter", data={}).send_error_response()
 
         current_user.hashed_password = security.pwd_context.hash(data.new_password)
         db.commit()

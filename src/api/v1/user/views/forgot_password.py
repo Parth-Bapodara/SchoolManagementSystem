@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from src.api.v1.user.schemas.forgot_password import PasswordResetRequest, PasswordResetVerify, ChangePassword, Phone, PasswordResetVerifyMob
 from src.api.v1.utils.response_utils import Response
 from src.api.v1.user.services.Login.user_auth import UserService
-from src.api.v1.security.security import JWTBearer
+from src.api.v1.security.security import JWTBearer,get_logged_user, get_current_user
 from Database.database import get_db
 from src.api.v1.user.models.user_models import User
 import logging
@@ -21,9 +21,10 @@ async def password_reset(data: PasswordResetVerify, db: Session = Depends(get_db
     return await UserService.password_reset(data, db)
 
 @router.post("/password-change/")
-async def change_password(data: ChangePassword, current_user: User = Depends(JWTBearer()), db: Session = Depends(get_db)):
+async def change_password(data: ChangePassword, current_user: User = Depends(get_logged_user), db: Session = Depends(get_db)):
     """Change the current user's password."""
-    return UserService.change_password(db, current_user, data.old_password, data.new_password, data.confirm_password)
+    logger.info(current_user)
+    return await UserService.change_password(db, current_user, data)
 
 @router.post("/reset-password-mobile")
 async def password_reset_by_mobile(data: Phone, db:Session = Depends(get_db)):

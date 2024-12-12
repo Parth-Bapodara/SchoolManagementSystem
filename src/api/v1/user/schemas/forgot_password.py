@@ -57,9 +57,9 @@ class PasswordResetVerifyMob(BaseModel):
 
 #to change user password
 class ChangePassword(BaseModel):
-    old_password: str = Field(example="Test@1234")
-    new_password: str = Field(example="Demo@1234")
-    confirm_password: str = Field(example="Demo@1234")
+    old_password: str = Field()
+    new_password: str = Field(...,example="Demo@1234")
+    confirm_password: str = Field(...,example="Demo@1234")
 
     @field_validator("new_password")
     def validate_password(cls, password):

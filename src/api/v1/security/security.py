@@ -140,5 +140,9 @@ async def get_logged_user(token: str = Depends(JWTBearer()), db: Session = Depen
     """
     Decodes the JWT token and returns the user data.
     """
-    user_data = decode_access_token(token)
+    try:
+        user_data = decode_access_token(token)
+    except:
+        return Response(status_code=403, message="The token is Expired.Generate a new one and try again.")
+    
     return user_data 
