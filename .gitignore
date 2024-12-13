@@ -1,1 +1,7 @@
 .env
+__pycache__
+#*.cpython
+*.pyc
+*.cpython-310.pyc
+database.cpython-310.pyc
+*.cpython-310.pyc
